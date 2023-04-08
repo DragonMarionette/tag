@@ -1,22 +1,25 @@
 use std::fmt::Display;
 use crate::piece::Piece;
 
-#[allow(dead_code)]
 
 #[derive(Debug, Clone)]
-pub enum BoardIndexError {
+pub enum PlacementError {
     RowIndexOutOfBounds {idx_found: usize, board_size: usize},
     ColIndexOutOfBounds {idx_found: usize, board_size: usize},
+    SpaceOccupied {row: usize, col: usize}
 }
 
-impl Display for BoardIndexError {
+impl Display for PlacementError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoardIndexError::RowIndexOutOfBounds {idx_found, board_size} => {
+            PlacementError::RowIndexOutOfBounds {idx_found, board_size} => {
                 write!(f, "Found row index {}, but board is of size {}", idx_found, board_size)
             },
-            BoardIndexError::ColIndexOutOfBounds {idx_found, board_size} => {
+            PlacementError::ColIndexOutOfBounds {idx_found, board_size} => {
                 write!(f, "Found col index {}, but board is of size {}", idx_found, board_size)
+            },
+            PlacementError::SpaceOccupied { row: row_idx, col: col_idx } => {
+                write!(f, "Space at row {}, col {} already occupied", row_idx, col_idx)
             },
         }
     }
@@ -25,7 +28,7 @@ impl Display for BoardIndexError {
 
 #[derive(Debug, Clone)]
 pub struct Board {
-    size: usize,
+    pub size: usize,
     grid: Vec<Vec<Piece>>
 }
 
@@ -35,24 +38,25 @@ impl Board {
         Board {size, grid}
     }
     
-    pub fn piece_at(&self, row:usize, col:usize) -> Result<Piece, BoardIndexError> {
+    pub fn piece_at(&self, row:usize, col:usize) -> Result<Piece, PlacementError> {
         if row >= self.size {
-            return Err(BoardIndexError::RowIndexOutOfBounds {idx_found: row, board_size: self.size});
+            return Err(PlacementError::RowIndexOutOfBounds {idx_found: row, board_size: self.size});
         }
         if col >= self.size {
-            return Err(BoardIndexError::ColIndexOutOfBounds {idx_found: col, board_size: self.size});
+            return Err(PlacementError::ColIndexOutOfBounds {idx_found: col, board_size: self.size});
         }
         Ok(self.grid[row][col])
     }
     
-    pub fn place(&mut self, p: Piece, row:usize, col:usize) -> Result<(), BoardIndexError> {
-        if self.piece_at(row, col)? == Piece::Empty {
-            self.grid[row][col] = p;
+    pub fn place(&mut self, p: Piece, row:usize, col:usize) -> Result<(), PlacementError> {
+        if self.piece_at(row, col)? != Piece::Empty {
+            return Err(PlacementError::SpaceOccupied { row, col });
         }
+        self.grid[row][col] = p;
         Ok(())
     }
 
-    pub fn _invert(&mut self) -> () {
+    pub fn invert(&mut self) -> () {
         for row in 0..self.size {
             for col in 0..self.size {
                 self.grid[row][col] = self.grid[row][col].inverse();
@@ -85,8 +89,29 @@ impl Board {
 
         return false;
     }
+
+    pub fn pretty(&self) -> String {
+        let mut display_string = " ".to_string();
+
+        for col in 0..self.size {
+            display_string += &format!("  {}", ('A' as u8 + col as u8) as char);
+        }
+
+        for row in 0..self.size {
+            display_string += &format!("\n{}", row + 1);
+
+            for col in 0..self.size {
+                let this_piece = &self.grid[row][col];
+                display_string += &format!("  {}", this_piece);
+            }
+        }
+
+        display_string
+    }
 }
 
+
+// Does not include row/column indices
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut display_string = "".to_string();
