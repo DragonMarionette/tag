@@ -56,7 +56,7 @@ impl Board {
         Ok(())
     }
 
-    pub fn invert(&mut self) -> () {
+    pub fn invert(&mut self) {
         for row in 0..self.size {
             for col in 0..self.size {
                 self.grid[row][col] = self.grid[row][col].inverse();
@@ -66,35 +66,36 @@ impl Board {
 
     pub fn has_win(&self, piece: Piece) -> bool {
         let remaining_rows: Vec<usize> = (0..self.size).collect();
-        let remaining_cols = remaining_rows.clone();
+        let remaining_cols: Vec<usize> = (0..self.size).collect();
+        println!("{:p} {:p}", &remaining_rows, &remaining_cols);
         self.has_win_recurrent(piece, &remaining_rows, &remaining_cols)
     }
 
-    fn has_win_recurrent(&self, piece: Piece, remaining_rows: &Vec<usize>, remaining_cols: &Vec<usize>) -> bool {
+    fn has_win_recurrent(&self, piece: Piece, remaining_rows: &[usize], remaining_cols: &[usize]) -> bool {
         if remaining_rows.is_empty() {
             return true;
         }
         let row = remaining_rows[0];
-        let remaining_rows = remaining_rows[1..].to_vec();
+        let remaining_rows = &remaining_rows[1..];
 
         for (i, &col) in remaining_cols.iter().enumerate() {
             if self.piece_at(row, col).unwrap() == piece {
-                let mut remaining_cols = remaining_cols.clone();
+                let mut remaining_cols = remaining_cols.to_owned();
                 remaining_cols.remove(i);
-                if self.has_win_recurrent(piece, &remaining_rows, &remaining_cols) {
+                if self.has_win_recurrent(piece, remaining_rows, &remaining_cols) {
                     return true;
                 }
             }
         }
 
-        return false;
+        false
     }
 
     pub fn pretty(&self) -> String {
         let mut display_string = " ".to_string();
 
         for col in 0..self.size {
-            display_string += &format!("  {}", ('A' as u8 + col as u8) as char);
+            display_string += &format!("  {}", (b'A' + col as u8) as char);
         }
 
         for row in 0..self.size {
@@ -111,7 +112,6 @@ impl Board {
 }
 
 
-// Does not include row/column indices
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut display_string = "".to_string();

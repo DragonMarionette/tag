@@ -68,8 +68,9 @@ fn make_move(player: Piece, game_board: &mut Board) {
         return make_move(player, game_board);
     }
 
-    let col = move_str.chars().nth(0).unwrap() as u8 - 'A' as u8; // TODO: These feel ugly. More idiomatic way to do it?
-    let row = move_str.chars().nth(1).unwrap().to_digit(10).unwrap() - 1;
+    let mut characters = move_str.chars();
+    let col = characters.next().unwrap() as u8 - b'A'; // TODO: These feel ugly. More idiomatic way to do it?
+    let row = characters.next().unwrap().to_digit(10).unwrap() - 1;
     
     match game_board.place(player, row as usize, col as usize) {
         Err(PlacementError::RowIndexOutOfBounds {..}) => {
