@@ -1,7 +1,7 @@
 use std::io;
 use std::io::Write;
 use regex::Regex;
-use crate::{piece::Piece, board::{Board, PlacementError}};
+use crate::{piece::Piece, board::{Board, GridError}};
 
 pub fn play_game() {    
     let mut game_board = Board::new(get_board_size());
@@ -73,15 +73,15 @@ fn make_move(player: Piece, game_board: &mut Board) {
     let row = characters.next().unwrap().to_digit(10).unwrap() - 1;
     
     match game_board.place(player, row as usize, col as usize) {
-        Err(PlacementError::RowIndexOutOfBounds {..}) => {
+        Err(GridError::RowIndexOutOfBounds {..}) => {
             println!("Invalid space, row out of bounds. Try again.");
             make_move(player, game_board)
         },
-        Err(PlacementError::ColIndexOutOfBounds {..}) => {
+        Err(GridError::ColIndexOutOfBounds {..}) => {
             println!("Invalid space, column out of bounds. Try again.");
             make_move(player, game_board)
         },
-        Err(PlacementError::SpaceOccupied {..}) => {
+        Err(GridError::SpaceOccupied {..}) => {
             println!("Space {} is already filled. Try again.", move_str);
             make_move(player, game_board)
         },
