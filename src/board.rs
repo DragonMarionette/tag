@@ -73,7 +73,6 @@ impl Board {
     pub fn has_win(&self, piece: Piece) -> bool {
         let remaining_rows: Vec<usize> = (0..self.size).collect();
         let remaining_cols: Vec<usize> = (0..self.size).collect();
-        println!("{:p} {:p}", &remaining_rows, &remaining_cols);
         self.has_win_recursive(piece, &remaining_rows, &remaining_cols)
     }
 
