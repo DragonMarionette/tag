@@ -88,21 +88,14 @@ impl AI {
 
         let key = scrambled.to_board();
 
-        self.analyze(&key);
+        let analysis = self.analyze(&key, self.depth);
 
-        // println!("self.known_boards = {:?}", self.known_boards);
-        let move_options = self.known_boards.get(&key).unwrap().move_options.clone();
-        let chosen_move = *move_options.choose(&mut self.rng).unwrap();
-        Coord::from_space(&scrambled.space_at(chosen_move).unwrap())
+        // let move_options = analysis.move_options;
+        let chosen_move = analysis.move_options.choose(&mut self.rng).unwrap();
+        Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
     }
 
-    fn analyze(&mut self, b: &Board) -> MoveAnalysis{ // analyze the given move, saving the resulting analysis to self.known_boards
-        self.analyze_recursive(b, self.depth)
-    }
-
-    fn analyze_recursive(&mut self, b: &Board, depth_remaining: usize) -> MoveAnalysis { // assumes it is getting an already-standardized board
-        
-
+    fn analyze(&mut self, b: &Board, depth_remaining: usize) -> MoveAnalysis { // assumes it is getting an already-standardized board
         if let Some(analysis) = self.known_boards.get(b) { // b already computed to sufficient depth
             if analysis.depth_used >= depth_remaining {
                 return analysis.clone();
@@ -148,7 +141,7 @@ impl AI {
             b.invert();
             let mut scrambled = ScrambledBoard::from_board(&b);
             scrambled.standardize();
-            let mut lower_analysis = self.analyze_recursive(&scrambled.to_board(), depth_remaining-1);
+            let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining-1);
 
             lower_analysis.evaluation = match lower_analysis.evaluation {
                 MoveValue::Lose(v) => MoveValue::Win(v+1),
