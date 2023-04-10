@@ -1,7 +1,8 @@
 #![allow(dead_code)]
-// #![allow(unused_imports)]
+#![allow(unused_imports)]
 
 use ai::ai::AI;
+use ai::ai_multi::AiMulti;
 
 mod piece;
 mod board;
@@ -20,13 +21,14 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use crate::ai::ai_multi::AiMulti;
     use crate::board::Board;
     use crate::piece::Piece;
     use crate::ai::ai::AI;
 
     #[test]
     fn analyze_test() {
-        let mut ai_x = AI::new(Piece::X, 100);
+        let mut ai_x = AiMulti::new(Piece::X, 100);
         let mut b = Board::new(4);
         ai_x.make_move(Piece::X, &mut b);
     }
