@@ -1,9 +1,9 @@
-use std::{collections::HashMap, ops::Deref, cmp::Ordering};
+use std::{collections::HashMap, cmp::Ordering};
 use rand::seq::SliceRandom;
 
 use crate::{board::Board, piece::Piece};
 
-use super::scrambled_board::{ScrambledBoard, Space, Coord};
+use super::scrambled_board::{ScrambledBoard, Coord};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
