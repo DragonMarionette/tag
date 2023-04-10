@@ -7,7 +7,7 @@ use super::scrambled_board::{ScrambledBoard, Coord};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum MoveValue {
+pub enum MoveValue {
     Lose(u8), // u8 for number of moves
     Tie(u8),
     Unknown(u8),
@@ -55,10 +55,10 @@ impl Ord for MoveValue {
 
 
 #[derive(Debug, Clone)]
-struct MoveAnalysis {
-    evaluation: MoveValue,
-    move_options: Vec<Coord>,
-    depth_used: usize
+pub struct MoveAnalysis {
+    pub evaluation: MoveValue,
+    pub move_options: Vec<Coord>,
+    pub depth_used: usize
 }
 
 pub struct AI {
