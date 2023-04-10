@@ -9,7 +9,7 @@ pub fn play_humans() {
 
     let mut current_player = Piece::X;
 
-    for _ in 0..(game_board.size * game_board.size) {
+   loop {
         if game_board.is_full() {
             println!("It's a tie!");
             return;
@@ -35,20 +35,44 @@ pub fn play_human_vs(mut ai_opponent: AI) {
 
     let mut current_player = Piece::X;
 
-    for _ in 0..(game_board.size * game_board.size) {
+    loop {
         if game_board.is_full() {
             println!("It's a tie!");
             return;
         }
 
-        // match current_player {
-        //     ai_piece => ai_opponent.make_move(current_player, &mut game_board),
-        //     _ => make_move_human(current_player, &mut game_board)
-        // };
         if current_player == ai_piece {
             ai_opponent.make_move(current_player, &mut game_board);
         } else {
             make_move_human(current_player, &mut game_board);
+        }
+        
+        println!("\n{}\n\n", game_board.pretty());
+
+        if game_board.has_win(current_player) {
+            println!("{} wins!", current_player);
+            return;
+        }
+        current_player = current_player.inverse();
+    }
+}
+
+pub fn play_ai_vs_ai(mut ai_x: AI, mut ai_o: AI) {
+    let mut game_board = Board::new(get_board_size());
+    println!("\n{}\n\n", game_board.pretty());
+
+    let mut current_player = Piece::X;
+
+    loop {
+        if game_board.is_full() {
+            println!("It's a tie!");
+            return;
+        }
+        
+        match current_player {
+            Piece::X => ai_x.make_move(Piece::X, &mut game_board),
+            Piece::O => ai_o.make_move(Piece::O, &mut game_board),
+            _ => ()
         }
         
         println!("\n{}\n\n", game_board.pretty());
