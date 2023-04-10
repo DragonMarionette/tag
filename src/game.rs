@@ -3,7 +3,7 @@ use std::io::Write;
 use regex::Regex;
 use crate::{piece::Piece, board::{Board, GridError}, ai::ai::AI};
 
-pub fn play_humans() {    
+pub fn play_human_vs_human() {    
     let mut game_board = Board::new(get_board_size());
     println!("\n{}\n\n", game_board.pretty());
 
@@ -27,7 +27,7 @@ pub fn play_humans() {
     }
 }
 
-pub fn play_human_vs(mut ai_opponent: AI) {    
+pub fn play_human_vs_ai(mut ai_opponent: AI) {    
     let ai_piece = ai_opponent.piece;
 
     let mut game_board = Board::new(get_board_size());
