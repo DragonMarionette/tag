@@ -6,9 +6,9 @@ use crate::board::{Board, GridError};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Space {
-    piece: Piece,
-    row: usize,
-    col: usize,
+    pub piece: Piece,
+    pub row: usize,
+    pub col: usize,
 }
 
 impl Debug for Space {
@@ -16,6 +16,17 @@ impl Debug for Space {
         write!(f, "{}({}, {})", self.piece, self.row, self.col )
     }
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Coord {pub row: usize, pub col: usize}
+
+impl Coord {
+    pub fn from_space(s: &Space) -> Coord {
+        Coord {row: s.row, col: s.col}
+    }
+}
+
 
 #[derive(Clone, Debug)]
 pub struct ScrambledBoard {
@@ -38,7 +49,7 @@ impl ScrambledBoard {
         ScrambledBoard { size, grid }
     }
 
-    pub fn to_board(&self) -> Board {
+    pub fn to_original_board(&self) -> Board {
         let mut b = Board::new(self.size);
         for space in self.spaces() {
             b.place(space.piece, space.row, space.col).unwrap();
@@ -46,23 +57,12 @@ impl ScrambledBoard {
         b
     }
 
-    pub fn to_board_scrambled(&self) -> Board {
-        // let size = self.size;
-        // let mut grid = Vec::new();
-
-        // for row in 0..size {
-        //     let mut this_row = Vec::new();
-        //     for col in 0..size {
-        //         this_row.push(self.piece_at(row, col).unwrap());
-        //     }
-        //     grid.push(this_row);
-        // }
-        // Board {size, grid}
+    pub fn to_board(&self) -> Board {
         let mut b = Board::new(self.size);
 
         for row in 0..self.size {
             for col in 0..self.size {
-                b.place(self.piece_at(row, col).unwrap(), row, col).unwrap();
+                b.place(self.piece_at(Coord {row, col}).unwrap(), row, col).unwrap();
             }
         }
         
@@ -77,14 +77,19 @@ impl ScrambledBoard {
         self.grid.iter_mut().flatten()
     }
 
-    pub fn piece_at(&self, row: usize, col: usize) -> Result<Piece, GridError> {
+    pub fn space_at(&self, coordinate: Coord) -> Result<Space, GridError> {
+        let (row, col) = (coordinate.row, coordinate.col);
         if row >= self.size {
             return Err(GridError::RowIndexOutOfBounds {idx_found: row, board_size: self.size});
         }
         if col >= self.size {
             return Err(GridError::ColIndexOutOfBounds {idx_found: col, board_size: self.size});
         }
-        Ok(self.grid[row][col].piece)
+        Ok(self.grid[row][col])
+    }
+
+    pub fn piece_at(&self, coordinate: Coord) -> Result<Piece, GridError> {
+        Ok(self.space_at(coordinate)?.piece)
     }
 
     fn transpose(&mut self) {

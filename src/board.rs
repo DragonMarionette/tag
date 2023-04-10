@@ -26,7 +26,7 @@ impl Display for GridError {
 }
 
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Board {
     pub size: usize,
     grid: Vec<Vec<Piece>>
@@ -54,6 +54,17 @@ impl Board {
         }
         self.grid[row][col] = p;
         Ok(())
+    }
+
+    pub fn is_full(&self) -> bool {
+        for row in 0..self.size {
+            for col in 0..self.size {
+                if self.grid[row][col] == Piece::Empty {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     pub fn invert(&mut self) {
