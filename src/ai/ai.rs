@@ -1,5 +1,6 @@
 use std::{collections::HashMap, cmp::Ordering};
 use rand::seq::SliceRandom;
+// use rayon::prelude::*;
 
 use crate::{board::Board, piece::Piece};
 
@@ -8,10 +9,10 @@ use super::scrambled_board::{ScrambledBoard, Coord};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum MoveValue {
-    Lose(u8),
+    Lose(u8), // u8 for number of moves
     Tie(u8),
     Unknown(u8),
-    Win(u8) // number of moves
+    Win(u8)
 }
 
 impl PartialOrd for MoveValue {
@@ -90,7 +91,6 @@ impl AI {
 
         let analysis = self.analyze(&key, self.depth);
 
-        // let move_options = analysis.move_options;
         let chosen_move = analysis.move_options.choose(&mut self.rng).unwrap();
         Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
     }
@@ -133,8 +133,9 @@ impl AI {
         }
 
         // recursive case
+        // let mut found_win = false;
         let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
-        for c in available_spaces(b) {
+        available_spaces(b).into_iter().for_each(|c| {
             let mut b = b.clone();
             b.place(self.piece, c.row, c.col).unwrap();
             b.invert();
@@ -149,8 +150,10 @@ impl AI {
                 MoveValue::Win(v) => MoveValue::Lose(v+1),
             };
 
-            // // short-circuit to never explore after the first known win. Slows things down for some reason
+            // // short-circuit to never explore after the first known win.
+            // // Decreases recursion and p1 calls to analyze but increases p2 calls to analyze (a slowdown for some reason)
             // if let MoveValue::Win(_) = lower_analysis.evaluation {
+            //     found_win = true; /////////////////////////////////////////////////////////////////////////////
             //     let new_analysis = MoveAnalysis {
             //         evaluation: lower_analysis.evaluation,
             //         move_options: vec![c],
@@ -162,8 +165,8 @@ impl AI {
             // }
 
             new_analyses.push((c, lower_analysis))
-        }
-
+        });
+        
         let shallowest_depth = new_analyses.iter()
             .map(|a| a.1.depth_used)
             .min().unwrap();
