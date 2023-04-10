@@ -1,5 +1,7 @@
+use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, cmp::Ordering};
 use rand::seq::SliceRandom;
+use rayon::prelude::*;
 
 use crate::{board::Board, piece::Piece};
 
@@ -9,13 +11,13 @@ use super::ai::{MoveAnalysis, MoveValue};
 pub struct AiMulti {
     pub piece: Piece,
     depth: usize,
-    known_boards: HashMap<Board, MoveAnalysis>
+    known_boards: Arc<Mutex<HashMap<Board, MoveAnalysis>>>
 }
 
 
 impl AiMulti {
     pub fn new(piece: Piece, depth: usize) -> AiMulti {
-        AiMulti { piece, depth, known_boards: HashMap::new() }
+        AiMulti { piece, depth, known_boards: Arc::new(Mutex::new(HashMap::new())) }
     }
 
     pub fn make_move(&mut self, player: Piece, game_board: &mut Board) {
@@ -38,8 +40,8 @@ impl AiMulti {
         Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
     }
 
-    fn analyze(&mut self, b: &Board, depth_remaining: usize) -> MoveAnalysis { // assumes it is getting an already-standardized board
-        if let Some(analysis) = self.known_boards.get(b) { // b already computed to sufficient depth
+    fn analyze(&self, b: &Board, depth_remaining: usize) -> MoveAnalysis { // assumes it is getting an already-standardized board
+        if let Some(analysis) = self.known_boards.lock().unwrap().get(b) { // b already computed to sufficient depth
             if analysis.depth_used >= depth_remaining {
                 return analysis.clone();
             }
@@ -51,7 +53,7 @@ impl AiMulti {
                 move_options: vec![],
                 depth_used: self.depth, // max depth because no need to ever reanalyze this position deeper
             };
-            self.known_boards.insert(b.clone(), new_analysis.clone());
+            self.known_boards.lock().unwrap().insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
@@ -61,7 +63,7 @@ impl AiMulti {
                 move_options: vec![],
                 depth_used: self.depth, // max depth because no need to ever reanalyze this position deeper
             };
-            self.known_boards.insert(b.clone(), new_analysis.clone());
+            self.known_boards.lock().unwrap().insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
@@ -71,29 +73,33 @@ impl AiMulti {
                 move_options: available_spaces(b),
                 depth_used: 0,
             };
-            self.known_boards.insert(b.clone(), new_analysis.clone());
+            self.known_boards.lock().unwrap().insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
         // recursive case
-        let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
-        available_spaces(b).into_iter().for_each(|c| {
-            let mut b = b.clone();
-            b.place(self.piece, c.row, c.col).unwrap();
-            b.invert();
-            let mut scrambled = ScrambledBoard::from_board(&b);
-            scrambled.standardize();
-            let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining-1);
-
-            lower_analysis.evaluation = match lower_analysis.evaluation {
-                MoveValue::Lose(v) => MoveValue::Win(v+1),
-                MoveValue::Tie(v) => MoveValue::Tie(v+1),
-                MoveValue::Unknown(v) => MoveValue::Unknown(v+1),
-                MoveValue::Win(v) => MoveValue::Lose(v+1),
-            };
-
-            new_analyses.push((c, lower_analysis))
-        });
+        let mut new_analyses: Vec<(Coord, MoveAnalysis)>;
+        {
+            let new_analyses_shared = Arc::new(Mutex::new(Vec::new()));
+            available_spaces(b).into_iter().for_each(|c| {
+                let mut b = b.clone();
+                b.place(self.piece, c.row, c.col).unwrap();
+                b.invert();
+                let mut scrambled = ScrambledBoard::from_board(&b);
+                scrambled.standardize();
+                let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining-1);
+    
+                lower_analysis.evaluation = match lower_analysis.evaluation {
+                    MoveValue::Lose(v) => MoveValue::Win(v+1),
+                    MoveValue::Tie(v) => MoveValue::Tie(v+1),
+                    MoveValue::Unknown(v) => MoveValue::Unknown(v+1),
+                    MoveValue::Win(v) => MoveValue::Lose(v+1),
+                };
+    
+                new_analyses_shared.lock().unwrap().push((c, lower_analysis))
+            });
+            new_analyses = new_analyses_shared.lock().unwrap().clone();
+        }
         let shallowest_depth = new_analyses.iter()
             .map(|a| a.1.depth_used)
             .min().unwrap();
@@ -115,7 +121,7 @@ impl AiMulti {
             move_options,
             depth_used,
         };
-        self.known_boards.insert(b.clone(), new_analysis.clone());
+        self.known_boards.lock().unwrap().insert(b.clone(), new_analysis.clone());
 
         new_analysis
     }
