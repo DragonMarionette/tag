@@ -17,3 +17,17 @@ fn main() {
     let ai_o = AI::new(piece::Piece::O, 100);
     game::play_ai_vs_ai(ai_x, ai_o);
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::board::Board;
+    use crate::piece::Piece;
+    use crate::ai::ai::AI;
+
+    #[test]
+    fn analyze_test() {
+        let mut ai_x = AI::new(Piece::X, 100);
+        let mut b = Board::new(4);
+        ai_x.make_move(Piece::X, &mut b);
+    }
+}
