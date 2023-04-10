@@ -1,6 +1,5 @@
 use std::{collections::HashMap, cmp::Ordering};
 use rand::seq::SliceRandom;
-// use rayon::prelude::*;
 
 use crate::{board::Board, piece::Piece};
 
@@ -65,14 +64,13 @@ struct MoveAnalysis {
 pub struct AI {
     pub piece: Piece,
     depth: usize,
-    known_boards: HashMap<Board, MoveAnalysis>,
-    rng: rand::rngs::ThreadRng,
+    known_boards: HashMap<Board, MoveAnalysis>
 }
 
 
 impl AI {
     pub fn new(piece: Piece, depth: usize) -> AI {
-        AI { piece, depth, known_boards: HashMap::new(), rng: rand::thread_rng() }
+        AI { piece, depth, known_boards: HashMap::new() }
     }
 
     pub fn make_move(&mut self, player: Piece, game_board: &mut Board) {
@@ -91,7 +89,7 @@ impl AI {
 
         let analysis = self.analyze(&key, self.depth);
 
-        let chosen_move = analysis.move_options.choose(&mut self.rng).unwrap();
+        let chosen_move = analysis.move_options.choose(&mut rand::thread_rng()).unwrap();
         Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
     }
 
@@ -133,7 +131,6 @@ impl AI {
         }
 
         // recursive case
-        // let mut found_win = false;
         let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
         available_spaces(b).into_iter().for_each(|c| {
             let mut b = b.clone();
@@ -150,23 +147,8 @@ impl AI {
                 MoveValue::Win(v) => MoveValue::Lose(v+1),
             };
 
-            // // short-circuit to never explore after the first known win.
-            // // Decreases recursion and p1 calls to analyze but increases p2 calls to analyze (a slowdown for some reason)
-            // if let MoveValue::Win(_) = lower_analysis.evaluation {
-            //     found_win = true; /////////////////////////////////////////////////////////////////////////////
-            //     let new_analysis = MoveAnalysis {
-            //         evaluation: lower_analysis.evaluation,
-            //         move_options: vec![c],
-            //         depth_used: lower_analysis.depth_used + 1,
-            //     };
-            //     self.known_boards.insert(b.clone(), new_analysis.clone());
-        
-            //     return new_analysis;
-            // }
-
             new_analyses.push((c, lower_analysis))
         });
-        
         let shallowest_depth = new_analyses.iter()
             .map(|a| a.1.depth_used)
             .min().unwrap();
