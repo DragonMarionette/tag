@@ -133,7 +133,7 @@ impl AI {
         }
 
         // recursive case
-        // not really pruned against looking deeper when a win is already found, maybe do that
+        // let mut depth_remaining = depth_remaining; // for later pruning
         let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
         for c in available_spaces(b) {
             let mut b = b.clone();
@@ -150,7 +150,10 @@ impl AI {
                 MoveValue::Win(v) => MoveValue::Lose(v+1),
             };
 
-            // TODO: change depth_remaining to never search past soonest win
+            // // Prune to never explore deeper than the fastest known win (currently broken, leads to infinite loop)
+            // if let MoveValue::Win(new_depth) = lower_analysis.evaluation {
+            //     depth_remaining = new_depth as usize;
+            // }
 
             new_analyses.push((c, lower_analysis))
         }
