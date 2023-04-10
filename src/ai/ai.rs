@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{collections::HashMap, ops::Deref, cmp::Ordering};
 use rand::seq::SliceRandom;
 
 use crate::{board::Board, piece::Piece};
@@ -6,16 +6,57 @@ use crate::{board::Board, piece::Piece};
 use super::scrambled_board::{ScrambledBoard, Space, Coord};
 
 
-// enum MoveValue {
-//     Win(u8), // number of moves
-//     Lose(u8),
-//     Tie(u8),
-//     Unknown(u8)
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MoveValue {
+    Lose(u8),
+    Tie(u8),
+    Unknown(u8),
+    Win(u8) // number of moves
+}
+
+impl PartialOrd for MoveValue {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for MoveValue {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self {
+            MoveValue::Lose(v) => {
+                match other {
+                    MoveValue::Lose(w) => v.cmp(w),
+                    _ => Ordering::Less,
+                }
+            },
+            MoveValue::Tie(v) => {
+                match other {
+                    MoveValue::Lose(_) => Ordering::Greater,
+                    MoveValue::Tie(w) => v.cmp(w),
+                    _ => Ordering::Less,
+                }
+            },
+            MoveValue::Unknown(v) => {
+                match other {
+                    MoveValue::Win(_) => Ordering::Less,
+                    MoveValue::Unknown(w) => w.cmp(v),
+                    _ => Ordering::Greater,
+                }
+            },
+            MoveValue::Win(v) => {
+                match other {
+                    MoveValue::Win(w) => w.cmp(v),
+                    _ => Ordering::Greater,
+                }
+            },
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 struct MoveAnalysis {
-    evaluation: i8, // should range from -100 to 100
+    evaluation: MoveValue,
     move_options: Vec<Coord>,
     depth_used: usize
 }
@@ -70,7 +111,7 @@ impl AI {
 
         if b.has_win(self.piece.inverse()) { // b already has other player winning
             let new_analysis = MoveAnalysis {
-                evaluation: -100,
+                evaluation: MoveValue::Lose(0),
                 move_options: vec![],
                 depth_used: self.depth, // max depth because no need to ever reanalyze this position deeper
             };
@@ -80,7 +121,7 @@ impl AI {
 
         if b.is_full() {
             let new_analysis = MoveAnalysis {
-                evaluation: 0,
+                evaluation: MoveValue::Tie(0),
                 move_options: vec![],
                 depth_used: self.depth, // max depth because no need to ever reanalyze this position deeper
             };
@@ -90,7 +131,7 @@ impl AI {
 
         if depth_remaining == 0 {
             let new_analysis = MoveAnalysis {
-                evaluation: self.evaluate_stupidly(b),
+                evaluation: MoveValue::Unknown(0),
                 move_options: available_spaces(b),
                 depth_used: 0,
             };
@@ -102,15 +143,21 @@ impl AI {
         // not really pruned against looking deeper when a win is already found, maybe do that
         let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
         for c in available_spaces(b) {
-            let (row, col) = (c.row, c.col);
             let mut b = b.clone();
-            b.place(self.piece, row, col).unwrap();
+            b.place(self.piece, c.row, c.col).unwrap();
             b.invert();
             let mut scrambled = ScrambledBoard::from_board(&b);
             scrambled.standardize();
             let mut lower_analysis = self.analyze_recursive(&scrambled.to_board(), depth_remaining-1);
 
-            lower_analysis.evaluation *= -1;
+            lower_analysis.evaluation = match lower_analysis.evaluation {
+                MoveValue::Lose(v) => MoveValue::Win(v+1),
+                MoveValue::Tie(v) => MoveValue::Tie(v+1),
+                MoveValue::Unknown(v) => MoveValue::Unknown(v+1),
+                MoveValue::Win(v) => MoveValue::Lose(v+1),
+            };
+
+            // TODO: change depth_remaining to never search past soonest win
 
             new_analyses.push((c, lower_analysis))
         }
@@ -120,19 +167,17 @@ impl AI {
             .min().unwrap();
         let depth_used = shallowest_depth + 1;
 
-        // println!("{}", b);
-
-        let best_evaluation = new_analyses.iter().map(|a| a.1.evaluation)
-            .max().unwrap();
         // filter to keep only the best-evaluated moves
+        let best_evaluation = new_analyses.iter().map(|a| a.1.evaluation.clone())
+            .max().unwrap();
         new_analyses = new_analyses.iter()
             .filter_map(|a| if a.1.evaluation == best_evaluation {Some(a.clone())} else {None})
             .collect();
 
         let move_options = new_analyses.iter()
-            // .filter(|a| a.1.depth_used == shallowest_depth)
             .map(|a| a.0)
             .collect();
+
         let new_analysis = MoveAnalysis {
             evaluation: best_evaluation,
             move_options,
@@ -141,10 +186,6 @@ impl AI {
         self.known_boards.insert(b.clone(), new_analysis.clone());
 
         new_analysis
-    }
-
-    fn evaluate_stupidly(&self, _b: &Board) -> i8 { // Optional TODO: use fraction of empty spaces left
-        0
     }
 }
 
