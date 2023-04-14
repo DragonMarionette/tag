@@ -79,9 +79,28 @@ impl AiMulti {
 
         // recursive case
         let mut new_analyses: Vec<(Coord, MoveAnalysis)>;
-        {
-            let new_analyses_shared = Arc::new(Mutex::new(Vec::new()));
+        if self.depth - depth_remaining <= 2 { // series. 2 is a magic number found experimentally
+            new_analyses = Vec::new();
             available_spaces(b).into_iter().for_each(|c| {
+                let mut b = b.clone();
+                b.place(self.piece, c.row, c.col).unwrap();
+                b.invert();
+                let mut scrambled = ScrambledBoard::from_board(&b);
+                scrambled.standardize();
+                let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining-1);
+    
+                lower_analysis.evaluation = match lower_analysis.evaluation {
+                    MoveValue::Lose(v) => MoveValue::Win(v+1),
+                    MoveValue::Tie(v) => MoveValue::Tie(v+1),
+                    MoveValue::Unknown(v) => MoveValue::Unknown(v+1),
+                    MoveValue::Win(v) => MoveValue::Lose(v+1),
+                };
+    
+                new_analyses.push((c, lower_analysis))
+            });
+        } else { // parallel
+            let new_analyses_shared = Arc::new(Mutex::new(Vec::new()));
+            available_spaces(b).into_par_iter().for_each(|c| {
                 let mut b = b.clone();
                 b.place(self.piece, c.row, c.col).unwrap();
                 b.invert();
@@ -100,6 +119,7 @@ impl AiMulti {
             });
             new_analyses = new_analyses_shared.lock().unwrap().clone();
         }
+        
         let shallowest_depth = new_analyses.iter()
             .map(|a| a.1.depth_used)
             .min().unwrap();
