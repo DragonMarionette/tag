@@ -7,8 +7,8 @@ use super::scrambled_board::{ScrambledBoard, Coord};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MoveValue {
-    Lose(u8), // u8 for number of moves
+pub enum MoveValue { // u8 represents number of moves until the outcome is guaranteed achieveable
+    Lose(u8),
     Tie(u8),
     Unknown(u8),
     Win(u8)
@@ -53,6 +53,16 @@ impl Ord for MoveValue {
     }
 }
 
+impl MoveValue {
+    pub fn depth(&self) -> u8{
+        match *self {
+            MoveValue::Lose(v) => v,
+            MoveValue::Tie(v) => v,
+            MoveValue::Unknown(v) => v,
+            MoveValue::Win(v) => v,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct MoveAnalysis {
