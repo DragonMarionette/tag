@@ -1,0 +1,1 @@
+Rust scripts to play the [transversal achievement game](http://www.openproblemgarden.org/op/a_transversal_achievement_game_on_a_square_grid) (TAG) and find its optimal strategy with an arbitrary board size. A rewriting of the less efficient [python version](https://github.com/DragonMarionette/TicTagToe)
