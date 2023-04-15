@@ -1,5 +1,5 @@
 pub mod board;
-use board::Board;
+pub use board::Board;
 
 pub mod game;
 

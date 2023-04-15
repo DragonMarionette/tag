@@ -2,10 +2,19 @@
 use tag::{
     game,
     Piece,
-    players::{AiParallel, Human, AiSerial},
+    Board,
+    players::{Player, Human, AiParallel, AiSerial},
 };
 
 fn main() {
+    // play();
+    let mut ai_x = AiSerial::new(Piece::X, 100);
+    let mut b = Board::new(4);
+    ai_x.make_move(&mut b);
+}
+
+#[allow(dead_code)]
+fn play() {
     let board_size = game::get_board_size();
 
     let mut p1 = Human::new("Dan X", Piece::X);
