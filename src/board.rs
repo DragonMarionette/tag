@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use crate::piece::Piece;
+use crate::Piece;
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,9 +33,9 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new(size: usize) -> Board {
+    pub fn new(size: usize) -> Self {
         let grid = vec![ vec![Piece::Empty ; size] ; size ];
-        Board {size, grid}
+        Self {size, grid}
     }
     
     pub fn piece_at(&self, row:usize, col:usize) -> Result<Piece, GridError> {
@@ -75,7 +75,7 @@ impl Board {
         }
     }
 
-    pub fn inverse(&self) -> Board {
+    pub fn inverse(&self) -> Self {
         let mut inverted = self.clone();
         inverted.invert();
         inverted

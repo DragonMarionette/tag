@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
-use crate::piece::Piece;
-use crate::board::{Board, GridError};
+use crate::board::GridError;
+use crate::Board;
+use crate::Piece;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Space {
@@ -13,20 +14,24 @@ pub struct Space {
 
 impl Debug for Space {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({}, {})", self.piece, self.row, self.col )
+        write!(f, "{}({}, {})", self.piece, self.row, self.col)
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Coord {pub row: usize, pub col: usize}
+pub struct Coord {
+    pub row: usize,
+    pub col: usize,
+}
 
 impl Coord {
     pub fn from_space(s: &Space) -> Coord {
-        Coord {row: s.row, col: s.col}
+        Coord {
+            row: s.row,
+            col: s.col,
+        }
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct ScrambledBoard {
@@ -35,18 +40,22 @@ pub struct ScrambledBoard {
 }
 
 impl ScrambledBoard {
-    pub fn from_board(b: &Board) -> ScrambledBoard {
+    pub fn from_board(b: &Board) -> Self {
         let size = b.size;
         let mut grid = Vec::new();
         for row in 0..size {
             let mut this_row = Vec::new();
-                for col in 0..size {
-                    this_row.push(Space {piece: b.piece_at(row, col).unwrap(), row, col} );
-                }
+            for col in 0..size {
+                this_row.push(Space {
+                    piece: b.piece_at(row, col).unwrap(),
+                    row,
+                    col,
+                });
+            }
             grid.push(this_row);
         }
 
-        ScrambledBoard { size, grid }
+        Self { size, grid }
     }
 
     pub fn to_original_board(&self) -> Board {
@@ -62,28 +71,35 @@ impl ScrambledBoard {
 
         for row in 0..self.size {
             for col in 0..self.size {
-                b.place(self.piece_at(Coord {row, col}).unwrap(), row, col).unwrap();
+                b.place(self.piece_at(Coord { row, col }).unwrap(), row, col)
+                    .unwrap();
             }
         }
-        
+
         b
     }
 
-    pub fn spaces(&self) -> std::iter::Flatten<std::slice::Iter<'_, Vec<Space>>>{
+    pub fn spaces(&self) -> std::iter::Flatten<std::slice::Iter<'_, Vec<Space>>> {
         self.grid.iter().flatten()
     }
 
-    pub fn spaces_mut(&mut self) -> std::iter::Flatten<std::slice::IterMut<'_, Vec<Space>>>{
+    pub fn spaces_mut(&mut self) -> std::iter::Flatten<std::slice::IterMut<'_, Vec<Space>>> {
         self.grid.iter_mut().flatten()
     }
 
     pub fn space_at(&self, coordinate: Coord) -> Result<Space, GridError> {
         let (row, col) = (coordinate.row, coordinate.col);
         if row >= self.size {
-            return Err(GridError::RowIndexOutOfBounds {idx_found: row, board_size: self.size});
+            return Err(GridError::RowIndexOutOfBounds {
+                idx_found: row,
+                board_size: self.size,
+            });
         }
         if col >= self.size {
-            return Err(GridError::ColIndexOutOfBounds {idx_found: col, board_size: self.size});
+            return Err(GridError::ColIndexOutOfBounds {
+                idx_found: col,
+                board_size: self.size,
+            });
         }
         Ok(self.grid[row][col])
     }
@@ -103,26 +119,11 @@ impl ScrambledBoard {
         }
     }
 
-    fn transposed(&self) -> ScrambledBoard {
+    fn _transposed(&self) -> Self {
         let mut new_board = self.clone();
         new_board.transpose();
         new_board
     }
-    
-    // fn transpose_shallow(&mut self) {
-    //     for space in self.spaces_mut(){
-    //         let row = space.row;
-    //         let col = space.col;
-    //         space.col = row;
-    //         space.row = col;
-    //     }
-    // }
-    //
-    // fn transposed_shallow(&self) -> ScrambledBoard {
-    //     let mut new_board = self.clone();
-    //     new_board.transpose_shallow();
-    //     new_board
-    // }
 
     pub fn invert(&mut self) {
         for space in self.spaces_mut() {
@@ -130,7 +131,7 @@ impl ScrambledBoard {
         }
     }
 
-    pub fn inverse(&self) -> ScrambledBoard{
+    pub fn inverse(&self) -> Self {
         let mut new_board = self.clone();
         new_board.invert();
         new_board
@@ -143,27 +144,33 @@ impl ScrambledBoard {
         self.grid.sort_unstable_by(row_cmp);
     }
 
-    pub fn standardized(&self) -> ScrambledBoard {
+    pub fn standardized(&self) -> Self {
         let mut new_board = self.clone();
         new_board.standardize();
         new_board
     }
-
 }
-
 
 fn row_cmp(left: &Vec<Space>, right: &Vec<Space>) -> Ordering {
     let left_count = count(left, Piece::O);
     let right_count = count(right, Piece::O);
     match left_count.cmp(&right_count) {
-        Ordering::Equal => if left_count == 0 {return Ordering::Equal;}, // if O's equal and nonzero, move to next step of comparison
+        Ordering::Equal => { // if O's equal and nonzero, move to next step of comparison
+            if left_count == 0 {
+                return Ordering::Equal;
+            }
+        },
         o => return o,
     };
 
     let left_count = count(left, Piece::X);
     let right_count = count(right, Piece::X);
     match left_count.cmp(&right_count) {
-        Ordering::Equal => if left_count == 0 {return Ordering::Equal;}, // if X's equal and nonzero, move to next step of comparison
+        Ordering::Equal => { // if X's equal and nonzero, move to next step of comparison
+            if left_count == 0 {
+                return Ordering::Equal;
+            }
+        },
         o => return o,
     };
 
@@ -180,5 +187,8 @@ fn count(vec: &Vec<Space>, p: Piece) -> usize {
 }
 
 fn weight_positions(vec: &Vec<Space>, p: Piece) -> usize {
-    vec.iter().enumerate().map(|(i, &space)| if space.piece == p {1 << i} else {0}).sum()
+    vec.iter()
+        .enumerate()
+        .map(|(i, &space)| if space.piece == p { 1 << i } else { 0 })
+        .sum()
 }

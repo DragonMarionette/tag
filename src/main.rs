@@ -1,35 +1,20 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
-use ai::ai::AI;
-use ai::ai_multi::AiMulti;
-
-mod piece;
-mod board;
-mod game;
-mod ai;
-// use crate::{piece::Piece, board::Board};
+#[allow(unused_imports)]
+use tag::{
+    game,
+    Piece,
+    players::{AiParallel, Human, AiSerial},
+};
 
 fn main() {
-    // let ai_opponent = AI::new(piece::Piece::X, 100);
-    // game::play_human_vs(ai_opponent);
+    let board_size = game::get_board_size();
 
-    let ai_x = AI::new(piece::Piece::X, 100);
-    let ai_o = AI::new(piece::Piece::O, 100);
-    game::play_ai_vs_ai(ai_x, ai_o);
-}
+    let mut p1 = Human::new("Dan X", Piece::X);
+    // let mut p1 = AiSerial::new(Piece::X, 100);
+    // let mut p1 = AiParallel::new(Piece::X, 100);
 
-#[cfg(test)]
-mod tests {
-    use crate::ai::ai_multi::AiMulti;
-    use crate::board::Board;
-    use crate::piece::Piece;
-    use crate::ai::ai::AI;
+    // let mut p2 = Human::new("Dan O", Piece::O);
+    let mut p2 = AiSerial::new(Piece::O, 100);
+    // let mut p2 = AiParallel::new(Piece::O, 100);
 
-    #[test]
-    fn analyze_test() {
-        let mut ai_x = AiMulti::new(Piece::X, 100);
-        let mut b = Board::new(4);
-        ai_x.make_move(Piece::X, &mut b);
-    }
+    game::play_game(&mut p1, &mut p2, board_size)
 }

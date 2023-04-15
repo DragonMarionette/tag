@@ -1,91 +1,45 @@
 use std::io;
 use std::io::Write;
-use regex::Regex;
-use crate::{piece::Piece, board::{Board, GridError}, ai::ai::AI};
+use crate::{Piece, Board, players::Player};
 
-pub fn play_human_vs_human() {    
-    let mut game_board = Board::new(get_board_size());
+
+pub fn play_game<'a>(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) {
+    assert_ne!(p1.piece(), Piece::Empty);
+    assert_ne!(p2.piece(), Piece::Empty);
+    assert_ne!(p1.piece(), p2.piece());
+
+    let mut game_board = Board::new(board_size);
     println!("\n{}\n\n", game_board.pretty());
 
-    let mut current_player = Piece::X;
+    // this is neccessary because p1 and p2 may be of different types but can both be stored in current_player
+    let mut p1: Box<&mut dyn Player> = Box::new(p1);
+    let mut p2: Box<&mut dyn Player> = Box::new(p2);
 
-   loop {
+    for turn in (1..=2).cycle() {
         if game_board.is_full() {
             println!("It's a tie!");
             return;
         }
 
-        make_move_human(current_player, &mut game_board);
+        let current_player = match turn {
+            1 => &mut p1,
+            2 => &mut p2,
+            _ => {panic!("turn was neither 1 nor 2, which should never happen");}
+        };
+
+        current_player.make_move(&mut game_board);
         
         println!("\n{}\n\n", game_board.pretty());
 
-        if game_board.has_win(current_player) {
+        if game_board.has_win(current_player.piece()) {
             println!("{} wins!", current_player);
             return;
         }
-        current_player = current_player.inverse();
     }
 }
 
-pub fn play_human_vs_ai(mut ai_opponent: AI) {    
-    let ai_piece = ai_opponent.piece;
 
-    let mut game_board = Board::new(get_board_size());
-    println!("\n{}\n\n", game_board.pretty());
-
-    let mut current_player = Piece::X;
-
-    loop {
-        if game_board.is_full() {
-            println!("It's a tie!");
-            return;
-        }
-
-        if current_player == ai_piece {
-            ai_opponent.make_move(current_player, &mut game_board);
-        } else {
-            make_move_human(current_player, &mut game_board);
-        }
-        
-        println!("\n{}\n\n", game_board.pretty());
-
-        if game_board.has_win(current_player) {
-            println!("{} wins!", current_player);
-            return;
-        }
-        current_player = current_player.inverse();
-    }
-}
-
-pub fn play_ai_vs_ai(mut ai_x: AI, mut ai_o: AI) {
-    let mut game_board = Board::new(get_board_size());
-    println!("\n{}\n\n", game_board.pretty());
-
-    let mut current_player = Piece::X;
-
-    loop {
-        if game_board.is_full() {
-            println!("It's a tie!");
-            return;
-        }
-        
-        match current_player {
-            Piece::X => ai_x.make_move(Piece::X, &mut game_board),
-            Piece::O => ai_o.make_move(Piece::O, &mut game_board),
-            _ => ()
-        }
-        
-        println!("\n{}\n\n", game_board.pretty());
-
-        if game_board.has_win(current_player) {
-            println!("{} wins!", current_player);
-            return;
-        }
-        current_player = current_player.inverse();
-    }
-}
-
-fn get_board_size() -> usize { // TODO: Write to be cleaner using match or something?
+pub fn get_board_size() -> usize {
     let mut input = String::new();
     print!("Enter a size for the board: ");
     std::io::stdout().flush().unwrap();  // guarantee that the above print is written to console
@@ -109,43 +63,4 @@ fn get_board_size() -> usize { // TODO: Write to be cleaner using match or somet
     }
 
     size
-}
-
-fn make_move_human(player: Piece, game_board: &mut Board) {
-    let mut input = String::new();
-    print!("{}, enter your move: ", player);
-    std::io::stdout().flush().unwrap();  // guarantee that the above print is written to console
-
-    if io::stdin().read_line(&mut input).is_err() {
-        println!("Unable to read your input. Try again.");
-        return make_move_human(player, game_board);
-    }
-
-    input = input.to_uppercase();
-    let move_str = input.trim();
-    let move_validator = Regex::new(r"^[A-Z]\d$").unwrap(); // TODO: Compile only once using lazystatic, or check w/out regex
-    if !move_validator.is_match(move_str) {
-        println!("Invalid space. Enter in the form \"A1\"");
-        return make_move_human(player, game_board);
-    }
-
-    let mut characters = move_str.chars();
-    let col = characters.next().unwrap() as u8 - b'A'; // TODO: These feel ugly. More idiomatic way to do it?
-    let row = characters.next().unwrap().to_digit(10).unwrap() - 1;
-    
-    match game_board.place(player, row as usize, col as usize) {
-        Err(GridError::RowIndexOutOfBounds {..}) => {
-            println!("Invalid space, row out of bounds. Try again.");
-            make_move_human(player, game_board)
-        },
-        Err(GridError::ColIndexOutOfBounds {..}) => {
-            println!("Invalid space, column out of bounds. Try again.");
-            make_move_human(player, game_board)
-        },
-        Err(GridError::SpaceOccupied {..}) => {
-            println!("Space {} is already filled. Try again.", move_str);
-            make_move_human(player, game_board)
-        },
-        Ok(_) => ()
-    }
 }
