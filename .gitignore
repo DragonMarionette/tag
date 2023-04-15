@@ -1,3 +1,5 @@
 /target
 perf.data
 perf.data.old
+run-perf.sh
+test.perf
