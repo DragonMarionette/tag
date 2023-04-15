@@ -5,7 +5,7 @@ use crate::board::GridError;
 use crate::Board;
 use crate::Piece;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Space {
     pub piece: Piece,
     pub row: usize,
@@ -33,7 +33,7 @@ impl Coord {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ScrambledBoard {
     size: usize,
     grid: Vec<Vec<Space>>,
@@ -119,7 +119,7 @@ impl ScrambledBoard {
         }
     }
 
-    fn _transposed(&self) -> Self {
+    fn transposed(&self) -> Self {
         let mut new_board = self.clone();
         new_board.transpose();
         new_board
@@ -138,10 +138,10 @@ impl ScrambledBoard {
     }
 
     pub fn standardize(&mut self) {
-        self.transpose();
         self.grid.sort_unstable_by(row_cmp);
         self.transpose();
         self.grid.sort_unstable_by(row_cmp);
+        // *self = self.clone().min(self.transposed());
     }
 
     pub fn standardized(&self) -> Self {
