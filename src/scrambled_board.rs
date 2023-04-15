@@ -119,6 +119,7 @@ impl ScrambledBoard {
         }
     }
 
+    #[allow(dead_code)]
     fn transposed(&self) -> Self {
         let mut new_board = self.clone();
         new_board.transpose();
