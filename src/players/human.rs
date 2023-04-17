@@ -43,8 +43,7 @@ impl Player for Human {
 
         input = input.to_uppercase();
         let move_str = input.trim();
-        let move_validator = regex::Regex::new(r"^[A-Z]\d$").unwrap(); // TODO: Compile only once using lazystatic, or check w/out regex
-        if !move_validator.is_match(move_str) {
+        if !validate_move_syntax(move_str) {
             println!("Invalid space. Enter in the form \"A1\"");
             return self.make_move(game_board);
         }
@@ -69,4 +68,12 @@ impl Player for Human {
             Ok(_) => (),
         }
     }
+}
+
+fn validate_move_syntax(move_str: &str) -> bool {
+    let mut chars = move_str.chars();
+
+    chars.next().unwrap_or_else(| | ' ').is_ascii_alphabetic()
+    && chars.next().unwrap_or_else(| | ' ').is_ascii_digit()
+    && chars.next().is_none()
 }
