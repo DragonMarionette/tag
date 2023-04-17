@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
@@ -18,7 +19,7 @@ impl Debug for Space {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Coord {
     pub row: usize,
     pub col: usize,
@@ -156,22 +157,24 @@ fn row_cmp(left: &Vec<Space>, right: &Vec<Space>) -> Ordering {
     let left_count = count(left, Piece::O);
     let right_count = count(right, Piece::O);
     match left_count.cmp(&right_count) {
-        Ordering::Equal => { // if O's equal and nonzero, move to next step of comparison
+        Ordering::Equal => {
+            // if O's equal and nonzero, move to next step of comparison
             if left_count == 0 {
                 return Ordering::Equal;
             }
-        },
+        }
         o => return o,
     };
 
     let left_count = count(left, Piece::X);
     let right_count = count(right, Piece::X);
     match left_count.cmp(&right_count) {
-        Ordering::Equal => { // if X's equal and nonzero, move to next step of comparison
+        Ordering::Equal => {
+            // if X's equal and nonzero, move to next step of comparison
             if left_count == 0 {
                 return Ordering::Equal;
             }
-        },
+        }
         o => return o,
     };
 

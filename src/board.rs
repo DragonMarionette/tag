@@ -1,54 +1,80 @@
-use std::fmt::Display;
 use crate::Piece;
-
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GridError {
-    RowIndexOutOfBounds {idx_found: usize, board_size: usize},
-    ColIndexOutOfBounds {idx_found: usize, board_size: usize},
-    SpaceOccupied {row: usize, col: usize}
+    RowIndexOutOfBounds { idx_found: usize, board_size: usize },
+    ColIndexOutOfBounds { idx_found: usize, board_size: usize },
+    SpaceOccupied { row: usize, col: usize },
 }
 
 impl Display for GridError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GridError::RowIndexOutOfBounds {idx_found, board_size} => {
-                write!(f, "Found row index {}, but board is of size {}", idx_found, board_size)
-            },
-            GridError::ColIndexOutOfBounds {idx_found, board_size} => {
-                write!(f, "Found col index {}, but board is of size {}", idx_found, board_size)
-            },
-            GridError::SpaceOccupied { row: row_idx, col: col_idx } => {
-                write!(f, "Space at row {}, col {} already occupied", row_idx, col_idx)
-            },
+            GridError::RowIndexOutOfBounds {
+                idx_found,
+                board_size,
+            } => {
+                write!(
+                    f,
+                    "Found row index {}, but board is of size {}",
+                    idx_found, board_size
+                )
+            }
+            GridError::ColIndexOutOfBounds {
+                idx_found,
+                board_size,
+            } => {
+                write!(
+                    f,
+                    "Found col index {}, but board is of size {}",
+                    idx_found, board_size
+                )
+            }
+            GridError::SpaceOccupied {
+                row: row_idx,
+                col: col_idx,
+            } => {
+                write!(
+                    f,
+                    "Space at row {}, col {} already occupied",
+                    row_idx, col_idx
+                )
+            }
         }
     }
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Board {
     pub size: usize,
-    grid: Vec<Vec<Piece>>
+    grid: Vec<Vec<Piece>>,
 }
 
 impl Board {
     pub fn new(size: usize) -> Self {
-        let grid = vec![ vec![Piece::Empty ; size] ; size ];
-        Self {size, grid}
+        let grid = vec![vec![Piece::Empty; size]; size];
+        Self { size, grid }
     }
-    
-    pub fn piece_at(&self, row:usize, col:usize) -> Result<Piece, GridError> {
+
+    pub fn piece_at(&self, row: usize, col: usize) -> Result<Piece, GridError> {
         if row >= self.size {
-            return Err(GridError::RowIndexOutOfBounds {idx_found: row, board_size: self.size});
+            return Err(GridError::RowIndexOutOfBounds {
+                idx_found: row,
+                board_size: self.size,
+            });
         }
         if col >= self.size {
-            return Err(GridError::ColIndexOutOfBounds {idx_found: col, board_size: self.size});
+            return Err(GridError::ColIndexOutOfBounds {
+                idx_found: col,
+                board_size: self.size,
+            });
         }
         Ok(self.grid[row][col])
     }
-    
-    pub fn place(&mut self, p: Piece, row:usize, col:usize) -> Result<(), GridError> {
+
+    pub fn place(&mut self, p: Piece, row: usize, col: usize) -> Result<(), GridError> {
         if self.piece_at(row, col)? != Piece::Empty {
             return Err(GridError::SpaceOccupied { row, col });
         }
@@ -87,7 +113,12 @@ impl Board {
         self.has_win_recursive(piece, &remaining_rows, &remaining_cols)
     }
 
-    fn has_win_recursive(&self, piece: Piece, remaining_rows: &[usize], remaining_cols: &[usize]) -> bool {
+    fn has_win_recursive(
+        &self,
+        piece: Piece,
+        remaining_rows: &[usize],
+        remaining_cols: &[usize],
+    ) -> bool {
         if remaining_rows.is_empty() {
             return true;
         }
@@ -126,7 +157,6 @@ impl Board {
         display_string
     }
 }
-
 
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

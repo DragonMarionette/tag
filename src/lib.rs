@@ -20,8 +20,9 @@ mod tests {
 
     #[test]
     fn analyze_ai_serial() {
-        let mut ai_x = AiSerial::new(Piece::X, 100);
-        let mut b = Board::new(4);
+        let size = 4;
+        let mut ai_x = AiSerial::new(size, Piece::X, 100);
+        let mut b = Board::new(size);
         ai_x.make_move(&mut b);
     }
 

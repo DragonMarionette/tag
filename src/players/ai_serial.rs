@@ -1,71 +1,15 @@
+use ciborium::{de, ser};
 use rand::seq::SliceRandom;
+use std::collections::HashMap;
 use std::fmt::Display;
-use std::{cmp::Ordering, collections::HashMap};
+use std::fs::File;
 
+use super::{MoveAnalysis, MoveValue, Player};
 use crate::scrambled_board::{Coord, ScrambledBoard};
-use crate::{board::Board, piece::Piece};
-use super::Player;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MoveValue {
-    // u8 represents number of moves until the outcome is guaranteed achieveable
-    Lose(u8),
-    Tie(u8),
-    Unknown(u8),
-    Win(u8),
-}
-
-impl PartialOrd for MoveValue {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for MoveValue {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self {
-            MoveValue::Lose(v) => match other {
-                MoveValue::Lose(w) => v.cmp(w),
-                _ => Ordering::Less,
-            },
-            MoveValue::Tie(v) => match other {
-                MoveValue::Lose(_) => Ordering::Greater,
-                MoveValue::Tie(w) => v.cmp(w),
-                _ => Ordering::Less,
-            },
-            MoveValue::Unknown(v) => match other {
-                MoveValue::Win(_) => Ordering::Less,
-                MoveValue::Unknown(w) => w.cmp(v),
-                _ => Ordering::Greater,
-            },
-            MoveValue::Win(v) => match other {
-                MoveValue::Win(w) => w.cmp(v),
-                _ => Ordering::Greater,
-            },
-        }
-    }
-}
-
-impl MoveValue {
-    #[allow(dead_code)]
-    pub fn depth(&self) -> u8 {
-        match *self {
-            MoveValue::Lose(v) => v,
-            MoveValue::Tie(v) => v,
-            MoveValue::Unknown(v) => v,
-            MoveValue::Win(v) => v,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct MoveAnalysis {
-    pub evaluation: MoveValue,
-    pub move_options: Vec<Coord>,
-    pub depth_used: usize,
-}
+use crate::{Board, Piece};
 
 pub struct AiSerial {
+    size: usize,
     piece: Piece,
     depth: usize,
     known_boards: HashMap<Board, MoveAnalysis>,
@@ -79,6 +23,8 @@ impl Display for AiSerial {
 
 impl Player for AiSerial {
     fn make_move(&mut self, game_board: &mut Board) {
+        assert_eq!(game_board.size, self.size);
+
         let chosen_move = self.choose_move(self.piece, game_board);
         game_board
             .place(self.piece(), chosen_move.row, chosen_move.col)
@@ -91,8 +37,9 @@ impl Player for AiSerial {
 }
 
 impl AiSerial {
-    pub fn new(piece: Piece, depth: usize) -> Self {
+    pub fn new(size: usize, piece: Piece, depth: usize) -> Self {
         Self {
+            size,
             piece,
             depth,
             known_boards: HashMap::new(),
@@ -207,6 +154,45 @@ impl AiSerial {
         self.known_boards.insert(b.clone(), new_analysis.clone());
 
         new_analysis
+    }
+
+    pub fn cbor_path(&self, inverted: bool) -> String {
+        let p = if inverted {
+            self.piece.inverse()
+        } else {
+            self.piece
+        };
+
+        let piece_str = match p {
+            Piece::X => "X",
+            Piece::O => "O",
+            _ => "_",
+        };
+        format!("strategies/known-moves-s{}-p{}.cbor", self.size, piece_str)
+    }
+
+    pub fn save_strategy(&self) {
+        let buffer = File::create(&self.cbor_path(false)).unwrap(); // TODO: make safe
+        ser::into_writer(&self.known_boards, buffer).unwrap();
+        println!("Saved strategy to {}", self.cbor_path(false));
+    }
+
+    pub fn load_strategy(&mut self) -> Option<()> {
+        if let Ok(f) = File::open(self.cbor_path(false)) {
+            self.known_boards = de::from_reader(f).unwrap();
+            println!("Read strategy from {}", self.cbor_path(false));
+            Some(())
+        } else if let Ok(f) = File::open(self.cbor_path(true)) {
+            let known_boards_inverted: HashMap<Board, MoveAnalysis> = de::from_reader(f).unwrap();
+            for b in known_boards_inverted.keys() {
+                let analysis = known_boards_inverted.get(b).unwrap();
+                self.known_boards.insert(b.inverse(), analysis.clone());
+            }
+            println!("Read strategy from {}", self.cbor_path(true));
+            Some(())
+        } else {
+            None
+        }
     }
 }
 

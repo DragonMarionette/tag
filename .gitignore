@@ -1,4 +1,5 @@
 /target
+/strategies
 perf.data
 perf.data.old
 run-perf.sh

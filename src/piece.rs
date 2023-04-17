@@ -1,7 +1,8 @@
 use std::fmt::Display;
 use colored::{Colorize, ColoredString};
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Piece {
     X,
     O,

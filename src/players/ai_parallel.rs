@@ -4,14 +4,10 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 
-use crate::{board::Board, piece::Piece};
+use crate::{Board, Piece};
 
-use super::{
-    ai_serial::{MoveAnalysis, MoveValue},
-    Player,
-};
+use super::{MoveAnalysis, MoveValue, Player};
 use crate::scrambled_board::{Coord, ScrambledBoard};
-
 
 const MAX_SERIAL_DEPTH: usize = 2;
 
@@ -119,7 +115,8 @@ impl AiParallel {
 
         // recursive case
         let mut new_analyses: Vec<(Coord, MoveAnalysis)>;
-        if self.depth - depth_remaining <= MAX_SERIAL_DEPTH { // serial
+        if self.depth - depth_remaining <= MAX_SERIAL_DEPTH {
+            // serial
             new_analyses = Vec::new();
             available_spaces(b).into_iter().for_each(|c| {
                 let mut b = b.clone();
@@ -138,7 +135,8 @@ impl AiParallel {
 
                 new_analyses.push((c, lower_analysis))
             });
-        } else { // parallel
+        } else {
+            // parallel
             let new_analyses_shared = Arc::new(Mutex::new(Vec::new()));
             available_spaces(b).into_par_iter().for_each(|c| {
                 let mut b = b.clone();
