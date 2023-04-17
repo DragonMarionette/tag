@@ -1,3 +1,4 @@
+use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 use std::fmt::Display;
 
@@ -6,15 +7,14 @@ use serde::{Deserialize, Serialize};
 use crate::scrambled_board::Coord;
 use crate::{Board, Piece};
 
-
 mod human;
 pub use human::Human;
 
 mod ai_serial;
 pub use ai_serial::AiSerial;
 
-mod ai_pruned;
-pub use ai_pruned::AiPruned;
+mod ai_lazy;
+pub use ai_lazy::AiLazy;
 
 mod ai_parallel;
 pub use ai_parallel::AiParallel;
@@ -93,4 +93,10 @@ fn available_spaces(b: &Board) -> Vec<Coord> {
         }
     }
     result
+}
+
+fn available_spaces_shuffled(b: &Board, rng: &mut impl rand::Rng) -> Vec<Coord> {
+    let mut vec_out = available_spaces(b);
+    vec_out.shuffle(rng);
+    vec_out
 }
