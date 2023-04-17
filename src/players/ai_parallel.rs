@@ -1,13 +1,13 @@
 use rand::seq::SliceRandom;
-use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fmt::Display;
+
+use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 
-use crate::{Board, Piece};
-
-use super::{MoveAnalysis, MoveValue, Player};
+use super::{MoveAnalysis, MoveValue, Player, available_spaces};
 use crate::scrambled_board::{Coord, ScrambledBoard};
+use crate::{Board, Piece};
 
 const MAX_SERIAL_DEPTH: usize = 2;
 
@@ -195,16 +195,4 @@ impl AiParallel {
 
         new_analysis
     }
-}
-
-fn available_spaces(b: &Board) -> Vec<Coord> {
-    let mut result = Vec::new();
-    for row in 0..b.size {
-        for col in 0..b.size {
-            if b.piece_at(row, col) == Ok(Piece::Empty) {
-                result.push(Coord { row, col })
-            }
-        }
-    }
-    result
 }
