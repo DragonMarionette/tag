@@ -1,10 +1,11 @@
 use ciborium::{de, ser};
-use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+use rand::{seq::SliceRandom, SeedableRng};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 
 use super::available_spaces_shuffled;
+use super::QuickRng;
 use super::{MoveAnalysis, MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
@@ -16,7 +17,7 @@ pub struct AiLazy {
     size: usize,
     piece: Piece,
     known_boards: HashMap<Board, MoveAnalysis>,
-    rng: SmallRng,
+    rng: QuickRng,
 }
 
 impl Display for AiLazy {
@@ -46,7 +47,7 @@ impl AiLazy {
             size,
             piece,
             known_boards: HashMap::new(),
-            rng: SmallRng::from_entropy(),
+            rng: QuickRng::from_entropy(),
         }
     }
 
