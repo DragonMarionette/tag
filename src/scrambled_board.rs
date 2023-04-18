@@ -126,6 +126,11 @@ impl ScrambledBoard {
         new_board.standardize();
         new_board
     }
+
+    pub fn into_standardized(&mut self) -> Self {
+        self.standardize();
+        *self
+    }
 }
 
 fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
