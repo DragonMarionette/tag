@@ -107,13 +107,17 @@ impl ScrambledBoard {
     }
 
     fn transpose(&mut self) { // TODO: update to work with 1d grid
-        for row in 0..self.size {
-            for col in 0..row {
-                let row_col = self.grid[row][col];
-                let col_row = self.grid[col][row];
-                self.grid[row][col] = col_row;
-                self.grid[col][row] = row_col;
-            }
+        // for row in 0..self.size {
+        //     for col in 0..row {
+        //         let row_col = self.grid[row][col];
+        //         let col_row = self.grid[col][row];
+        //         self.grid[row][col] = col_row;
+        //         self.grid[col][row] = row_col;
+        //     }
+        // }
+        let size = self.size;
+        for i in 0..size*size {
+            self.grid.swap(i, (i % size) * 4 + i / size)
         }
     }
 
@@ -137,9 +141,11 @@ impl ScrambledBoard {
     }
 
     pub fn standardize(&mut self) { // TODO: update to work with 1d grid
-        self.grid.sort_unstable_by(row_cmp);
-        self.transpose();
-        self.grid.sort_unstable_by(row_cmp);
+        // self.grid.sort_unstable_by(row_cmp);
+        // self.transpose();
+        // self.grid.sort_unstable_by(row_cmp);
+        let mut rows: Vec<&[Space]> = self.grid.chunks(self.size).collect();
+        rows.sort_unstable_by(row_cmp);
         *self = self.clone().min(self.transposed());
     }
 
@@ -150,7 +156,7 @@ impl ScrambledBoard {
     }
 }
 
-fn row_cmp(left: &Vec<Space>, right: &Vec<Space>) -> Ordering {
+fn row_cmp(left: &[Space], right: &[Space]) -> Ordering {
     let left_count = count(left, Piece::O);
     let right_count = count(right, Piece::O);
     match left_count.cmp(&right_count) {
