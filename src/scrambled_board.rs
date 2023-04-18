@@ -4,27 +4,25 @@ use crate::board::GridError;
 use crate::Board;
 use crate::space::{Coord, Space, Piece};
 
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ScrambledBoard {
     size: usize,
-    grid: Vec<Vec<Space>>,
+    grid: Vec<Space>,
 }
 
 impl ScrambledBoard {
     pub fn from_board(b: &Board) -> Self {
         let size = b.size;
         let mut grid = Vec::new();
-        for row in 0..size {
-            let mut this_row = Vec::new();
-            for col in 0..size {
-                this_row.push(Space {
-                    piece: b.piece_at(row, col).unwrap(),
-                    row,
-                    col,
-                });
-            }
-            grid.push(this_row);
+        for (i, &piece) in b.flat().enumerate() {
+            grid.push(Space {
+                piece,
+                row: i / size,
+                col: i % size
+            })
         }
+        
 
         Self { size, grid }
     }
@@ -50,12 +48,12 @@ impl ScrambledBoard {
         b
     }
 
-    pub fn spaces(&self) -> std::iter::Flatten<std::slice::Iter<'_, Vec<Space>>> {
-        self.grid.iter().flatten()
+    pub fn spaces(&self) -> std::slice::Iter<'_, Space> {
+        self.grid.iter()
     }
 
-    pub fn spaces_mut(&mut self) -> std::iter::Flatten<std::slice::IterMut<'_, Vec<Space>>> {
-        self.grid.iter_mut().flatten()
+    pub fn spaces_mut(&mut self) -> std::slice::IterMut<'_, Space> {
+        self.grid.iter_mut()
     }
 
     pub fn space_at(&self, coordinate: Coord) -> Result<Space, GridError> {
@@ -72,25 +70,25 @@ impl ScrambledBoard {
                 board_size: self.size,
             });
         }
-        Ok(self.grid[row][col])
+        Ok(self.grid[row*self.size + col])
     }
 
     pub fn piece_at(&self, coordinate: Coord) -> Result<Piece, GridError> {
         Ok(self.space_at(coordinate)?.piece)
     }
 
-    fn transpose(&mut self) {
-        for row in 0..self.size {
-            for col in 0..row {
-                let row_col = self.grid[row][col];
-                let col_row = self.grid[col][row];
-                self.grid[row][col] = col_row;
-                self.grid[col][row] = row_col;
-            }
+    pub fn transpose(&mut self) {
+        let size = self.size;
+        for row in 0..size {
+            // for each index in row, starting from (but not including) the main diagonal
+            for i in (row*(size+1) + 1)..(row+1)*size {
+                let j = (i % size) * size + i / size;
+                self.grid.swap(i, j)
+
+            } 
         }
     }
 
-    #[allow(dead_code)]
     fn transposed(&self) -> Self {
         let mut new_board = self.clone();
         new_board.transpose();
@@ -110,9 +108,16 @@ impl ScrambledBoard {
     }
 
     pub fn standardize(&mut self) {
-        self.grid.sort_unstable_by(row_cmp);
+        let mut rows: Vec<&[Space]> = self.grid.chunks(self.size).collect();
+        rows.sort_unstable_by(row_cmp);
+        self.grid = rows.into_iter().flatten().map(|s| *s).collect();
+
         self.transpose();
-        self.grid.sort_unstable_by(row_cmp);
+        
+        let mut rows: Vec<&[Space]> = self.grid.chunks(self.size).collect();
+        rows.sort_unstable_by(row_cmp);
+        self.grid = rows.into_iter().flatten().map(|s| *s).collect();
+
         *self = self.clone().min(self.transposed());
     }
 
@@ -123,12 +128,12 @@ impl ScrambledBoard {
     }
 }
 
-fn row_cmp(left: &Vec<Space>, right: &Vec<Space>) -> Ordering {
+fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
     let left_count = count(left, Piece::O);
     let right_count = count(right, Piece::O);
     match left_count.cmp(&right_count) {
+        // if O's equal and nonzero, move to next step of comparison
         Ordering::Equal => {
-            // if O's equal and nonzero, move to next step of comparison
             if left_count == 0 {
                 return Ordering::Equal;
             }
@@ -139,8 +144,8 @@ fn row_cmp(left: &Vec<Space>, right: &Vec<Space>) -> Ordering {
     let left_count = count(left, Piece::X);
     let right_count = count(right, Piece::X);
     match left_count.cmp(&right_count) {
+        // if X's equal and nonzero, move to next step of comparison
         Ordering::Equal => {
-            // if X's equal and nonzero, move to next step of comparison
             if left_count == 0 {
                 return Ordering::Equal;
             }
@@ -149,19 +154,20 @@ fn row_cmp(left: &Vec<Space>, right: &Vec<Space>) -> Ordering {
     };
 
     match weight_positions(left, Piece::O).cmp(&weight_positions(right, Piece::O)) {
-        Ordering::Equal => (), // if O's same, move to next step of comparison
+        // if O's same, move to next step of comparison
+        Ordering::Equal => (),
         o => return o,
     };
 
     weight_positions(left, Piece::X).cmp(&weight_positions(right, Piece::X))
 }
 
-fn count(vec: &Vec<Space>, p: Piece) -> usize {
-    vec.iter().filter(|&space| space.piece == p).count()
+fn count(row: &[Space], p: Piece) -> usize {
+    row.iter().filter(|&space| space.piece == p).count()
 }
 
-fn weight_positions(vec: &Vec<Space>, p: Piece) -> usize {
-    vec.iter()
+fn weight_positions(row: &[Space], p: Piece) -> usize {
+    row.iter()
         .enumerate()
         .map(|(i, &space)| if space.piece == p { 1 << i } else { 0 })
         .sum()

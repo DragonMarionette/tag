@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 
-use super::{available_spaces_shuffled, MoveAnalysis, MoveValue, Player};
+use super::{MoveAnalysis, MoveValue, Player};
+use super::available_spaces_shuffled;
 use crate::space::{Coord, Piece};
 use crate::Board;
 use crate::ScrambledBoard;
-// use crate::scrambled_board_flat::ScrambledBoard;
 
 const MAX_DEPTH: usize = 100;
 

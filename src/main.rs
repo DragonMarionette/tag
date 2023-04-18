@@ -7,6 +7,7 @@ use tag::{
 
 fn main() {
     play();
+    // test_transpose(3)
     // let size = 4;
     // let mut ai_x = AiSerial::new(size, Piece::X, 100);
     // let mut ai_x = AiLazy::new(size, Piece::X);
