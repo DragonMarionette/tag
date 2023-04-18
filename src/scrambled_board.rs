@@ -37,24 +37,21 @@ impl Coord {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ScrambledBoard {
     size: usize,
-    grid: Vec<Vec<Space>>,
+    grid: Vec<Space>,
 }
 
 impl ScrambledBoard {
     pub fn from_board(b: &Board) -> Self {
         let size = b.size;
         let mut grid = Vec::new();
-        for row in 0..size {
-            let mut this_row = Vec::new();
-            for col in 0..size {
-                this_row.push(Space {
-                    piece: b.piece_at(row, col).unwrap(),
-                    row,
-                    col,
-                });
-            }
-            grid.push(this_row);
+        for (i, &piece) in b.flat().enumerate() {
+            grid.push(Space {
+                piece,
+                row: i / size,
+                col: i % size
+            })
         }
+        
 
         Self { size, grid }
     }
@@ -80,12 +77,12 @@ impl ScrambledBoard {
         b
     }
 
-    pub fn spaces(&self) -> std::iter::Flatten<std::slice::Iter<'_, Vec<Space>>> {
-        self.grid.iter().flatten()
+    pub fn spaces(&self) -> std::slice::Iter<'_, Space> {
+        self.grid.iter()
     }
 
-    pub fn spaces_mut(&mut self) -> std::iter::Flatten<std::slice::IterMut<'_, Vec<Space>>> {
-        self.grid.iter_mut().flatten()
+    pub fn spaces_mut(&mut self) -> std::slice::IterMut<'_, Space> {
+        self.grid.iter_mut()
     }
 
     pub fn space_at(&self, coordinate: Coord) -> Result<Space, GridError> {
@@ -102,14 +99,14 @@ impl ScrambledBoard {
                 board_size: self.size,
             });
         }
-        Ok(self.grid[row][col])
+        Ok(self.grid[row*self.size + col])
     }
 
     pub fn piece_at(&self, coordinate: Coord) -> Result<Piece, GridError> {
         Ok(self.space_at(coordinate)?.piece)
     }
 
-    fn transpose(&mut self) {
+    fn transpose(&mut self) { // TODO: update to work with 1d grid
         for row in 0..self.size {
             for col in 0..row {
                 let row_col = self.grid[row][col];
@@ -139,11 +136,11 @@ impl ScrambledBoard {
         new_board
     }
 
-    pub fn standardize(&mut self) {
+    pub fn standardize(&mut self) { // TODO: update to work with 1d grid
         self.grid.sort_unstable_by(row_cmp);
         self.transpose();
         self.grid.sort_unstable_by(row_cmp);
-        // *self = self.clone().min(self.transposed());
+        *self = self.clone().min(self.transposed());
     }
 
     pub fn standardized(&self) -> Self {
