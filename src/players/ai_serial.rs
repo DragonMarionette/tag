@@ -123,7 +123,7 @@ impl AiSerial {
                 MoveValue::Win(v) => MoveValue::Lose(v + 1),
             };
 
-            new_analyses.push((c, lower_analysis))
+            new_analyses.push((c, lower_analysis));
         });
         let shallowest_depth = new_analyses.iter().map(|a| a.1.depth_used).min().unwrap();
         let depth_used = shallowest_depth + 1;

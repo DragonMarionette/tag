@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 
-use super::{MoveAnalysis, MoveValue, Player};
 use super::available_spaces_shuffled;
+use super::{MoveAnalysis, MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
 use crate::ScrambledBoard;
@@ -125,7 +125,7 @@ impl AiLazy {
                 return new_analysis;
             }
 
-            new_analyses.push((c, lower_analysis))
+            new_analyses.push((c, lower_analysis));
         }
 
         // filter to keep only the best-evaluated moves
