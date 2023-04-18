@@ -135,14 +135,8 @@ impl AiSerial {
             .max()
             .unwrap();
         new_analyses = new_analyses
-            .iter()
-            .filter_map(|a| {
-                if a.1.evaluation == best_evaluation {
-                    Some(a.clone())
-                } else {
-                    None
-                }
-            })
+            .into_iter()
+            .filter(|a| a.1.evaluation == best_evaluation)
             .collect();
 
         let move_options = new_analyses.iter().map(|a| a.0).collect();
