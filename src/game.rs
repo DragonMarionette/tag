@@ -3,7 +3,7 @@ use std::io::Write;
 use crate::{Piece, Board, players::Player};
 
 
-pub fn play_game<'a>(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) {
+pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) {
     assert_ne!(p1.piece(), Piece::Empty);
     assert_ne!(p2.piece(), Piece::Empty);
     assert_ne!(p1.piece(), p2.piece());
