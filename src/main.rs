@@ -7,10 +7,10 @@ use tag::{
 
 fn main() {
     play();
-    // test_transpose(3)
     // let size = 4;
     // let mut ai_x = AiSerial::new(size, Piece::X, 100);
     // let mut ai_x = AiLazy::new(size, Piece::X);
+    // let mut ai_x = AiParallel::new(size, Piece::X);
     // let mut b = Board::new(size);
     // ai_x.make_move(&mut b);
 }
@@ -21,13 +21,13 @@ fn play() {
 
     // let mut p1 = Human::new("Dan", Piece::X);
     // let mut p1 = AiSerial::new(board_size, Piece::X, 100);
-    // let mut p1 = AiParallel::new(Piece::X, 100);
+    // let mut p1 = AiParallel::new(Piece::X);
     let mut p1 = AiLazy::new(board_size, Piece::X);
     // p1.load_strategy();
 
     let mut p2 = Human::new("Dan", Piece::O);
     // let mut p2 = AiSerial::new(board_size, Piece::O, 100);
-    // let mut p2 = AiParallel::new(Piece::O, 100);
+    // let mut p2 = AiParallel::new(Piece::O);
     // let mut p2 = AiLazy::new(Piece::O);
     // p2.load_strategy();
 

@@ -26,7 +26,7 @@ mod tests {
 
     #[test]
     fn analyze_ai_parallel() {
-        let mut ai_x = AiParallel::new(Piece::X, 100);
+        let mut ai_x = AiParallel::new(Piece::X);
         let mut b = Board::new(5);
         ai_x.make_move(&mut b);
     }
