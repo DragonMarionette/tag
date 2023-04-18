@@ -210,14 +210,14 @@ impl Board {
     }
 
     pub fn is_full(&self) -> bool {
-        for row in 0..self.size {
-            for col in 0..self.size {
-                if self.grid[row*self.size + col] == Piece::Empty {
-                    return false;
-                }
-            }
-        }
-        true
+        // for row in 0..self.size {
+        //     for col in 0..self.size {
+        //         if self.grid[row*self.size + col] == Piece::Empty {
+        //             return false;
+        //         }
+        //     }
+        // }
+        self.grid.iter().map().all()
     }
 
     pub fn invert(&mut self) {
