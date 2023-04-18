@@ -1,21 +1,23 @@
-use rand::seq::SliceRandom;
+use rand::Rng;
+use rand::{seq::SliceRandom, SeedableRng};
 use std::collections::HashMap;
 use std::fmt::Display;
 
 use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
-use super::{available_spaces, MoveAnalysis, MoveValue, Player};
+use super::QuickRng;
+use super::{available_spaces_shuffled, MoveAnalysis, MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
 use crate::ScrambledBoard;
 
-const MAX_SERIAL_DEPTH: usize = 2;
+const MAX_SERIAL_DEPTH: usize = 3; // magic value found experimentally
+const MAX_DEPTH: usize = 100;
 
 pub struct AiParallel {
     pub piece: Piece,
-    depth: usize,
-    known_boards: Arc<Mutex<HashMap<Board, MoveAnalysis>>>,
+    known_boards: Arc<RwLock<HashMap<Board, MoveAnalysis>>>,
 }
 
 impl Display for AiParallel {
@@ -38,11 +40,10 @@ impl Player for AiParallel {
 }
 
 impl AiParallel {
-    pub fn new(piece: Piece, depth: usize) -> Self {
+    pub fn new(piece: Piece) -> Self {
         Self {
             piece,
-            depth,
-            known_boards: Arc::new(Mutex::new(HashMap::new())),
+            known_boards: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -56,7 +57,7 @@ impl AiParallel {
 
         let key = scrambled.to_board();
 
-        let analysis = self.analyze(&key, self.depth);
+        let analysis = self.analyze(&key, 0, QuickRng::from_entropy(), &Vec::new());
 
         let chosen_move = analysis
             .move_options
@@ -65,13 +66,17 @@ impl AiParallel {
         scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
     }
 
-    fn analyze(&self, b: &Board, depth_remaining: usize) -> MoveAnalysis {
+    fn analyze(
+        &self,
+        b: &Board,
+        current_depth: usize,
+        mut rng: impl Rng + Clone + Send + Sync,
+        parents: &Vec<Arc<RwLock<bool>>>,
+    ) -> MoveAnalysis {
         // assumes it is getting an already-standardized board
-        if let Some(analysis) = self.known_boards.lock().unwrap().get(b) {
+        if let Some(analysis) = self.known_boards.read().unwrap().get(b) {
             // b already computed to sufficient depth
-            if analysis.depth_used >= depth_remaining {
-                return analysis.clone();
-            }
+            return analysis.clone();
         }
 
         if b.has_win(self.piece.inverse()) {
@@ -79,10 +84,10 @@ impl AiParallel {
             let new_analysis = MoveAnalysis {
                 evaluation: MoveValue::Lose(0),
                 move_options: vec![],
-                depth_used: self.depth, // max depth because no need to ever reanalyze this position deeper
+                depth_used: MAX_DEPTH, // max depth because no need to ever reanalyze this position deeper
             };
             self.known_boards
-                .lock()
+                .write()
                 .unwrap()
                 .insert(b.clone(), new_analysis.clone());
             return new_analysis;
@@ -92,74 +97,110 @@ impl AiParallel {
             let new_analysis = MoveAnalysis {
                 evaluation: MoveValue::Tie(0),
                 move_options: vec![],
-                depth_used: self.depth, // max depth because no need to ever reanalyze this position deeper
+                depth_used: MAX_DEPTH, // max depth because no need to ever reanalyze this position deeper
             };
             self.known_boards
-                .lock()
-                .unwrap()
-                .insert(b.clone(), new_analysis.clone());
-            return new_analysis;
-        }
-
-        if depth_remaining == 0 {
-            let new_analysis = MoveAnalysis {
-                evaluation: MoveValue::Unknown(0),
-                move_options: available_spaces(b),
-                depth_used: 0,
-            };
-            self.known_boards
-                .lock()
+                .write()
                 .unwrap()
                 .insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
         // recursive case
+        let win_found = RwLock::new(false);
         let mut new_analyses: Vec<(Coord, MoveAnalysis)>;
-        if self.depth - depth_remaining <= MAX_SERIAL_DEPTH {
+        new_analyses = if current_depth <= MAX_SERIAL_DEPTH {
             // serial
-            new_analyses = Vec::new();
-            available_spaces(b).into_iter().for_each(|c| {
-                let mut b = b.clone();
-                b.place(self.piece, c.row, c.col).unwrap();
-                b.invert();
-                let mut scrambled = ScrambledBoard::from_board(&b);
-                scrambled.standardize();
-                let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining - 1);
+            available_spaces_shuffled(b, &mut rng)
+                .into_iter()
+                .map(|c| {
+                    if *win_found.read().unwrap() || parents.iter().any(|rw| *rw.read().unwrap()) {
+                        return None;
+                    }
+                    let mut b = b.clone();
+                    b.place(self.piece, c.row, c.col).unwrap();
+                    b.invert();
+                    let mut scrambled = ScrambledBoard::from_board(&b);
+                    scrambled.standardize();
 
-                lower_analysis.evaluation = match lower_analysis.evaluation {
-                    MoveValue::Lose(v) => MoveValue::Win(v + 1),
-                    MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                    MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                    MoveValue::Win(v) => MoveValue::Lose(v + 1),
-                };
+                    let mut parents_inner = parents.clone();
+                    parents_inner.push(Arc::new(RwLock::new(false)));
 
-                new_analyses.push((c, lower_analysis))
-            });
+                    let mut lower_analysis = self.analyze(
+                        &scrambled.to_board(),
+                        current_depth + 1,
+                        rng.clone(),
+                        &parents_inner,
+                    );
+
+                    lower_analysis.evaluation = match lower_analysis.evaluation {
+                        MoveValue::Lose(v) => MoveValue::Win(v + 1),
+                        MoveValue::Tie(v) => MoveValue::Tie(v + 1),
+                        MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
+                        MoveValue::Win(v) => MoveValue::Lose(v + 1),
+                    };
+
+                    if let MoveValue::Win(_) = lower_analysis.evaluation {
+                        *parents_inner.last().unwrap().write().unwrap() = true;
+                        *win_found.write().unwrap() = true;
+                    }
+
+                    Some((c, lower_analysis))
+                })
+                .map_while(|a| a)
+                .collect()
         } else {
             // parallel
-            let new_analyses_shared = Arc::new(Mutex::new(Vec::new()));
-            available_spaces(b).into_par_iter().for_each(|c| {
-                let mut b = b.clone();
-                b.place(self.piece, c.row, c.col).unwrap();
-                b.invert();
-                let mut scrambled = ScrambledBoard::from_board(&b);
-                scrambled.standardize();
-                let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining - 1);
+            available_spaces_shuffled(b, &mut rng)
+                .into_par_iter()
+                .filter_map(|c| {
+                    let rng = rng.clone();
+                    if *win_found.read().unwrap() || parents.iter().any(|rw| *rw.read().unwrap()) {
+                        return None;
+                    }
 
-                lower_analysis.evaluation = match lower_analysis.evaluation {
-                    MoveValue::Lose(v) => MoveValue::Win(v + 1),
-                    MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                    MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                    MoveValue::Win(v) => MoveValue::Lose(v + 1),
-                };
+                    let mut b = b.clone();
+                    b.place(self.piece, c.row, c.col).unwrap();
+                    b.invert();
+                    let mut scrambled = ScrambledBoard::from_board(&b);
+                    scrambled.standardize();
 
-                new_analyses_shared
-                    .lock()
-                    .unwrap()
-                    .push((c, lower_analysis))
-            });
-            new_analyses = new_analyses_shared.lock().unwrap().clone();
+                    let mut parents_inner = parents.clone();
+                    parents_inner.push(Arc::new(RwLock::new(false)));
+
+                    let mut lower_analysis = self.analyze(
+                        &scrambled.to_board(),
+                        current_depth + 1,
+                        rng,
+                        &parents_inner,
+                    );
+
+                    lower_analysis.evaluation = match lower_analysis.evaluation {
+                        MoveValue::Lose(v) => MoveValue::Win(v + 1),
+                        MoveValue::Tie(v) => MoveValue::Tie(v + 1),
+                        MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
+                        MoveValue::Win(v) => MoveValue::Lose(v + 1),
+                    };
+
+                    if let MoveValue::Win(_) = lower_analysis.evaluation {
+                        *parents_inner.last().unwrap().write().unwrap() = true;
+                        *win_found.write().unwrap() = true;
+                    }
+
+                    Some((c, lower_analysis))
+                })
+                .collect()
+        }; // parallel
+
+        if new_analyses.is_empty() {
+            // short circuited by another thread
+            let new_analysis = MoveAnalysis {
+                evaluation: MoveValue::Unknown(0),
+                move_options: vec![],
+                depth_used: 0,
+            };
+
+            return new_analysis;
         }
 
         let shallowest_depth = new_analyses.iter().map(|a| a.1.depth_used).min().unwrap();
@@ -172,14 +213,8 @@ impl AiParallel {
             .max()
             .unwrap();
         new_analyses = new_analyses
-            .iter()
-            .filter_map(|a| {
-                if a.1.evaluation == best_evaluation {
-                    Some(a.clone())
-                } else {
-                    None
-                }
-            })
+            .into_iter()
+            .filter(|a| a.1.evaluation == best_evaluation)
             .collect();
 
         let move_options = new_analyses.iter().map(|a| a.0).collect();
@@ -189,8 +224,9 @@ impl AiParallel {
             move_options,
             depth_used,
         };
+
         self.known_boards
-            .lock()
+            .write()
             .unwrap()
             .insert(b.clone(), new_analysis.clone());
 
