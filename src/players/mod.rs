@@ -4,8 +4,10 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use crate::scrambled_board::Coord;
-use crate::{Board, Piece};
+use crate::{
+    space::{Coord, Piece},
+    Board,
+};
 
 mod human;
 pub use human::Human;

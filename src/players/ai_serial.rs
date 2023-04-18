@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 
-use super::{MoveAnalysis, MoveValue, Player, available_spaces};
-use crate::scrambled_board::{Coord, ScrambledBoard};
-use crate::{Board, Piece};
+use super::{available_spaces, MoveAnalysis, MoveValue, Player};
+use crate::space::{Coord, Piece};
+use crate::Board;
+use crate::ScrambledBoard;
 
 pub struct AiSerial {
     size: usize,
@@ -62,7 +63,7 @@ impl AiSerial {
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
+        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
     }
 
     fn analyze(&mut self, b: &Board, depth_remaining: usize) -> MoveAnalysis {

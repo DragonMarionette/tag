@@ -5,8 +5,10 @@ use std::fmt::Display;
 use std::fs::File;
 
 use super::{available_spaces_shuffled, MoveAnalysis, MoveValue, Player};
-use crate::scrambled_board::{Coord, ScrambledBoard};
-use crate::{Board, Piece};
+use crate::space::{Coord, Piece};
+use crate::Board;
+use crate::ScrambledBoard;
+// use crate::scrambled_board_flat::ScrambledBoard;
 
 const MAX_DEPTH: usize = 100;
 
@@ -64,7 +66,7 @@ impl AiLazy {
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
+        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
     }
 
     fn analyze(&mut self, b: &Board) -> MoveAnalysis {

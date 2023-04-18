@@ -1,6 +1,6 @@
 use std::io;
 use std::io::Write;
-use crate::{Piece, Board, players::Player};
+use crate::{space::Piece, Board, players::Player};
 
 
 pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) {

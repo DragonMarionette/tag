@@ -4,7 +4,7 @@ use std::{fmt::Display, io};
 use super::Player;
 use crate::{
     board::{Board, GridError},
-    piece::Piece,
+    space::Piece,
 };
 
 pub struct Human {

@@ -1,4 +1,4 @@
-use crate::Piece;
+use crate::space::Piece;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 

@@ -2,7 +2,7 @@
 use tag::{
     game,
     players::{AiLazy, AiParallel, AiSerial, Human, Player},
-    Board, Piece,
+    Board, space::Piece,
 };
 
 fn main() {

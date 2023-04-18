@@ -5,9 +5,10 @@ use std::fmt::Display;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 
-use super::{MoveAnalysis, MoveValue, Player, available_spaces};
-use crate::scrambled_board::{Coord, ScrambledBoard};
-use crate::{Board, Piece};
+use super::{available_spaces, MoveAnalysis, MoveValue, Player};
+use crate::space::{Coord, Piece};
+use crate::Board;
+use crate::ScrambledBoard;
 
 const MAX_SERIAL_DEPTH: usize = 2;
 
@@ -61,7 +62,7 @@ impl AiParallel {
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        Coord::from_space(&scrambled.space_at(chosen_move.clone()).unwrap())
+        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
     }
 
     fn analyze(&self, b: &Board, depth_remaining: usize) -> MoveAnalysis {
