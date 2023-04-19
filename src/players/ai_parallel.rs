@@ -1,13 +1,11 @@
-use rand::Rng;
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{thread_rng, seq::SliceRandom};
 use std::collections::HashMap;
 use std::fmt::Display;
 
 use rayon::prelude::*;
 use std::sync::{Arc, RwLock};
 
-use super::QuickRng;
-use super::{available_spaces_shuffled, MoveAnalysis, MoveValue, Player};
+use super::{available_spaces, MoveAnalysis, MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
 use crate::ScrambledBoard;
@@ -57,22 +55,43 @@ impl AiParallel {
 
         let key = scrambled.to_board();
 
-        let analysis = self.analyze(&key, 0, QuickRng::from_entropy(), &Vec::new());
+        let analysis = self.analyze(&key, 0, &Vec::new());
 
-        let chosen_move = analysis
+        let mut chosen_move_initial = *analysis
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
+        chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
+
+        let chosen_move = self.equivalent_move(chosen_move_initial, &game_board);
+
+        chosen_move
     }
 
-    fn analyze(
-        &self,
-        b: &Board,
-        current_depth: usize,
-        mut rng: impl Rng + Clone + Send + Sync,
-        parents: &Vec<Arc<RwLock<bool>>>,
-    ) -> MoveAnalysis {
+    fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {
+        let mut moves: HashMap<(usize, usize), Board> = HashMap::new();
+
+        for row in 0..b.size {
+            for col in 0..b.size{
+                let mut this_board = b.clone();
+                if this_board.place(self.piece, row, col).is_ok(){
+                    let standardized = ScrambledBoard::from_board(&this_board).into_standardized().to_board();
+                    moves.insert((row, col), standardized);
+                }
+            }
+        }
+        let mut equivalent: Vec<Coord> = Vec::new();
+        let reference_board = moves.get(&(reference_coord.row, reference_coord.col)).unwrap().clone();
+
+        for ((row, col), compared_board) in moves {
+            if compared_board == reference_board {
+                equivalent.push(Coord { row, col});
+            }
+        }
+        equivalent.choose(&mut thread_rng()).unwrap().clone()
+    }
+
+    fn analyze(&self, b: &Board, current_depth: usize, parents: &Vec<Arc<RwLock<bool>>>) -> MoveAnalysis {
         // assumes it is getting an already-standardized board
         if let Some(analysis) = self.known_boards.read().unwrap().get(b) {
             // b already computed to sufficient depth
@@ -111,7 +130,7 @@ impl AiParallel {
         let mut new_analyses: Vec<(Coord, MoveAnalysis)>;
         new_analyses = if current_depth <= MAX_SERIAL_DEPTH {
             // serial
-            available_spaces_shuffled(b, &mut rng)
+            available_spaces(b)
                 .into_iter()
                 .map(|c| {
                     if *win_found.read().unwrap() || parents.iter().any(|rw| *rw.read().unwrap()) {
@@ -129,7 +148,6 @@ impl AiParallel {
                     let mut lower_analysis = self.analyze(
                         &scrambled.to_board(),
                         current_depth + 1,
-                        rng.clone(),
                         &parents_inner,
                     );
 
@@ -151,10 +169,9 @@ impl AiParallel {
                 .collect()
         } else {
             // parallel
-            available_spaces_shuffled(b, &mut rng)
+            available_spaces(b)
                 .into_par_iter()
                 .filter_map(|c| {
-                    let rng = rng.clone();
                     if *win_found.read().unwrap() || parents.iter().any(|rw| *rw.read().unwrap()) {
                         return None;
                     }
@@ -171,7 +188,6 @@ impl AiParallel {
                     let mut lower_analysis = self.analyze(
                         &scrambled.to_board(),
                         current_depth + 1,
-                        rng,
                         &parents_inner,
                     );
 

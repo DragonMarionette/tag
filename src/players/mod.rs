@@ -1,4 +1,3 @@
-use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 use std::fmt::Display;
 
@@ -95,50 +94,4 @@ fn available_spaces(b: &Board) -> Vec<Coord> {
         }
     }
     result
-}
-
-fn available_spaces_shuffled(b: &Board, rng: &mut impl rand::Rng) -> Vec<Coord> {
-    let mut vec_out = available_spaces(b);
-    vec_out.shuffle(rng);
-    vec_out
-}
-
-use rand_core::{RngCore, Error, impls};
-use rand::SeedableRng;
-use std::num::Wrapping;
-
-#[derive(Clone)]
-struct QuickRng(Wrapping<u32>);
-
-impl RngCore for QuickRng {
-    fn next_u32(&mut self) -> u32 {
-        self.0 = self.0 * Wrapping(65539_u32) >> 1;
-        self.0.0
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        impls::next_u64_via_u32(self)
-    }
-
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        impls::fill_bytes_via_next(self, dest)
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        Ok(self.fill_bytes(dest))
-    }
-}
-
-impl SeedableRng for QuickRng {
-    type Seed = [u8; 4];
-    
-    fn from_seed(seed: Self::Seed) -> Self {
-        Self(Wrapping(
-            ((seed[0] as u32) << 24) |
-            ((seed[1] as u32) << 16) |
-            ((seed[2] as u32) <<  8) |
-            ((seed[3] as u32) <<  0)
-
-        ))
-    }
 }

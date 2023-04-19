@@ -1,11 +1,10 @@
 use ciborium::{de, ser};
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{seq::SliceRandom, thread_rng};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 
-use super::available_spaces_shuffled;
-use super::QuickRng;
+use super::available_spaces;
 use super::{MoveAnalysis, MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
@@ -17,7 +16,6 @@ pub struct AiLazy {
     size: usize,
     piece: Piece,
     known_boards: HashMap<Board, MoveAnalysis>,
-    rng: QuickRng,
 }
 
 impl Display for AiLazy {
@@ -47,7 +45,6 @@ impl AiLazy {
             size,
             piece,
             known_boards: HashMap::new(),
-            rng: QuickRng::from_entropy(),
         }
     }
 
@@ -63,11 +60,38 @@ impl AiLazy {
 
         let analysis = self.analyze(&key);
 
-        let chosen_move = analysis
+        let mut chosen_move_initial = *analysis
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
+        chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
+
+        let chosen_move = self.equivalent_move(chosen_move_initial, &game_board);
+
+        chosen_move
+    }
+
+    fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {
+        let mut moves: HashMap<(usize, usize), Board> = HashMap::new();
+
+        for row in 0..b.size {
+            for col in 0..b.size{
+                let mut this_board = b.clone();
+                if this_board.place(self.piece, row, col).is_ok(){
+                    let standardized = ScrambledBoard::from_board(&this_board).into_standardized().to_board();
+                    moves.insert((row, col), standardized);
+                }
+            }
+        }
+        let mut equivalent: Vec<Coord> = Vec::new();
+        let reference_board = moves.get(&(reference_coord.row, reference_coord.col)).unwrap().clone();
+
+        for ((row, col), compared_board) in moves {
+            if compared_board == reference_board {
+                equivalent.push(Coord { row, col});
+            }
+        }
+        equivalent.choose(&mut thread_rng()).unwrap().clone()
     }
 
     fn analyze(&mut self, b: &Board) -> MoveAnalysis {
@@ -99,7 +123,7 @@ impl AiLazy {
 
         // recursive case
         let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
-        for c in available_spaces_shuffled(b, &mut self.rng) {
+        for c in available_spaces(b) {
             let mut recursion_board = b.clone();
             recursion_board.place(self.piece, c.row, c.col).unwrap();
             recursion_board.invert();
