@@ -1,6 +1,6 @@
 use std::io;
 use std::io::Write;
-use crate::{space::Piece, Board, players::Player};
+use crate::{space::Piece, Board, players::{Player, Human, AiParallel, AiSerial}};
 
 
 pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) {
@@ -38,7 +38,6 @@ pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) 
     }
 }
 
-
 pub fn get_board_size() -> usize {
     let mut input = String::new();
     print!("Enter a size for the board: ");
@@ -63,4 +62,41 @@ pub fn get_board_size() -> usize {
     }
 
     size
+}
+
+pub fn get_player(piece: Piece, size: usize) -> Box<dyn Player> {
+    println!("Choose a player to be {}. Options:", piece);
+    println!("0\tHuman");
+    println!("1\tLimited-lookahead AI");
+    println!("2\tUnpredictable perfect AI");
+    println!("3\tMore Predictable (but still perfect) AI");
+    println!("4\tDeterministic Perfect AI");
+    let mut input = String::new();
+    print!("Your choice: ");
+    std::io::stdout().flush().unwrap();  // guarantee that the above print is written to console
+
+    let mut input_or_err = io::stdin().read_line(&mut input);
+
+
+    while input_or_err.is_err()
+    || input.trim().parse::<usize>().is_err()
+    || input.trim().parse::<usize>().unwrap() > 4 {
+        println!("You must enter a number from 0 to 4.");
+        print!("Your choice: ");
+        std::io::stdout().flush().unwrap();  // guarantee that the above print is written to console
+        input.clear();
+        input_or_err = io::stdin().read_line(&mut input);
+    }
+
+    let player: Box<dyn Player>;
+    match input.trim().parse::<usize>().unwrap() {
+        0 => Box::new(Human::new("TODO", piece)), // TODO: get_name
+        1 => Box::new(AiSerial::new(size, piece, 2)), // TODO: get_depth
+        2 => Box::new(AiSerial::new(size, piece, 256)),
+        3 => Box::new(AiParallel::new(size, piece, false)),
+        4 => Box::new(AiParallel::new(size, piece, true)),
+        _ => panic!("Recieved an illegal input that should already have been handled")
+    }
+
+    player
 }
