@@ -127,9 +127,9 @@ impl ScrambledBoard {
         new_board
     }
 
-    pub fn into_standardized(&mut self) -> Self {
+    pub fn into_standardized(mut self) -> Self {
         self.standardize();
-        *self
+        self
     }
 }
 
