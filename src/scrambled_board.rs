@@ -117,7 +117,7 @@ impl ScrambledBoard {
         let mut rows: Vec<&[Space]> = self.grid.chunks(self.size).collect();
         rows.sort_unstable_by(row_cmp);
         self.grid = rows.into_iter().flatten().map(|s| *s).collect();
-
+        
         *self = self.clone().min(self.transposed());
     }
 
@@ -134,15 +134,15 @@ impl ScrambledBoard {
 }
 
 fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
+    if left == right {
+        return Ordering::Equal;
+    }
+
     let left_count = count(left, Piece::O);
     let right_count = count(right, Piece::O);
     match left_count.cmp(&right_count) {
-        // if O's equal and nonzero, move to next step of comparison
-        Ordering::Equal => {
-            if left_count == 0 {
-                return Ordering::Equal;
-            }
-        }
+        // if O's equal, move to next step of comparison
+        Ordering::Equal => (),
         o => return o,
     };
 
@@ -150,11 +150,7 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
     let right_count = count(right, Piece::X);
     match left_count.cmp(&right_count) {
         // if X's equal and nonzero, move to next step of comparison
-        Ordering::Equal => {
-            if left_count == 0 {
-                return Ordering::Equal;
-            }
-        }
+        Ordering::Equal => (),
         o => return o,
     };
 
