@@ -1,6 +1,8 @@
 use rand::{thread_rng, seq::SliceRandom};
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::fs::File;
+use ciborium::{de, ser};
 
 use rayon::prelude::*;
 use std::sync::{Arc, RwLock};
@@ -14,7 +16,8 @@ const MAX_SERIAL_DEPTH: usize = 3; // magic value found experimentally
 const MAX_DEPTH: usize = 100;
 
 pub struct AiParallel {
-    pub piece: Piece,
+    size: usize,
+    piece: Piece,
     known_boards: Arc<RwLock<HashMap<Board, MoveAnalysis>>>,
 }
 
@@ -38,8 +41,9 @@ impl Player for AiParallel {
 }
 
 impl AiParallel {
-    pub fn new(piece: Piece) -> Self {
+    pub fn new(size: usize, piece: Piece) -> Self {
         Self {
+            size,
             piece,
             known_boards: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -247,5 +251,47 @@ impl AiParallel {
             .insert(b.clone(), new_analysis.clone());
 
         new_analysis
+    }
+    
+    pub fn cbor_path(&self, inverted: bool) -> String {
+        let p = if inverted {
+            self.piece.inverse()
+        } else {
+            self.piece
+        };
+
+        let piece_str = match p {
+            Piece::X => "X",
+            Piece::O => "O",
+            _ => "_",
+        };
+        format!(
+            "strategies/known-moves-s{}-p{}-lazy.cbor",
+            self.size, piece_str
+        )
+    }
+
+    pub fn save_strategy(&self) {
+        let buffer = File::create(&self.cbor_path(false)).unwrap(); // TODO: make safe
+        ser::into_writer(&*self.known_boards.read().unwrap(), buffer).unwrap();
+        println!("Saved strategy to {}", self.cbor_path(false));
+    }
+
+    pub fn load_strategy(&mut self) -> Option<()> {
+        if let Ok(f) = File::open(self.cbor_path(false)) {
+            *self.known_boards.write().unwrap() = de::from_reader(f).unwrap();
+            println!("Read strategy from {}", self.cbor_path(false));
+            Some(())
+        } else if let Ok(f) = File::open(self.cbor_path(true)) {
+            let known_boards_inverted: HashMap<Board, MoveAnalysis> = de::from_reader(f).unwrap();
+            for b in known_boards_inverted.keys() {
+                let analysis = known_boards_inverted.get(b).unwrap();
+                self.known_boards.write().unwrap().insert(b.inverse(), analysis.clone());
+            }
+            println!("Read strategy from {}", self.cbor_path(true));
+            Some(())
+        } else {
+            None
+        }
     }
 }
