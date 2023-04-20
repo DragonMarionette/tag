@@ -2,8 +2,14 @@ use std::io;
 use std::io::Write;
 use crate::{space::Piece, Board, players::{Player, Human, AiParallel, AiSerial}};
 
+#[derive(Clone, Copy)]
+pub enum Winner {
+    P1,
+    P2,
+    Tie
+}
 
-pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) {
+pub fn play_game(p1: &mut Box<dyn Player>, p2: &mut Box<dyn Player>, board_size: usize) -> Winner {
     assert_ne!(p1.piece(), Piece::Empty);
     assert_ne!(p2.piece(), Piece::Empty);
     assert_ne!(p1.piece(), p2.piece());
@@ -11,20 +17,15 @@ pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) 
     let mut game_board = Board::new(board_size);
     println!("\n{}\n\n", game_board.pretty());
 
-    // this is neccessary because p1 and p2 may be of different types but can both be stored in current_player
-    let mut p1: Box<&mut dyn Player> = Box::new(p1);
-    let mut p2: Box<&mut dyn Player> = Box::new(p2);
-
-    for turn in (1..=2).cycle() {
+    for turn in [Winner::P1, Winner::P2].iter().cycle() {
         if game_board.is_full() {
-            println!("It's a tie!");
-            return;
+            return Winner::Tie;
         }
 
         let current_player = match turn {
-            1 => &mut p1,
-            2 => &mut p2,
-            _ => {panic!("turn was neither 1 nor 2, which should never happen");}
+            Winner::P1 => &mut *p1,
+            Winner::P2 => &mut *p2,
+            _ => {panic!("turn was neither P1 nor P2, which should never happen");}
         };
 
         current_player.make_move(&mut game_board);
@@ -32,10 +33,10 @@ pub fn play_game(p1: &mut impl Player, p2: &mut impl Player, board_size: usize) 
         println!("\n{}\n\n", game_board.pretty());
 
         if game_board.has_win(current_player.piece()) {
-            println!("{} wins!", current_player);
-            return;
+            return *turn;
         }
     }
+    panic!("Loop ended, which should never happen")
 }
 
 pub fn get_board_size() -> usize {
@@ -88,15 +89,69 @@ pub fn get_player(piece: Piece, size: usize) -> Box<dyn Player> {
         input_or_err = io::stdin().read_line(&mut input);
     }
 
-    let player: Box<dyn Player>;
     match input.trim().parse::<usize>().unwrap() {
-        0 => Box::new(Human::new("TODO", piece)), // TODO: get_name
-        1 => Box::new(AiSerial::new(size, piece, 2)), // TODO: get_depth
-        2 => Box::new(AiSerial::new(size, piece, 256)),
-        3 => Box::new(AiParallel::new(size, piece, false)),
-        4 => Box::new(AiParallel::new(size, piece, true)),
+        0 => {
+            Box::new(Human::new(&get_name(piece), piece))
+        },
+        1 => {
+            let mut new_player = Box::new(AiSerial::new(size, piece, get_depth(size)));
+            new_player.load_strategy();
+            new_player
+        },
+        2 => {
+            let mut new_player = Box::new(AiSerial::new(size, piece, usize::MAX));
+            new_player.load_strategy();
+            new_player
+        },
+        3 => {
+            let mut new_player = Box::new(AiParallel::new(size, piece, false));
+            new_player.load_strategy();
+            new_player
+        },
+        4 => {
+            let mut new_player = Box::new(AiParallel::new(size, piece, true));
+            new_player.load_strategy();
+            new_player
+        },
         _ => panic!("Recieved an illegal input that should already have been handled")
     }
+}
 
-    player
+fn get_depth(size: usize) -> usize {
+    let mut input = String::new();
+    print!("Enter a depth for AI analysis: ");
+    std::io::stdout().flush().unwrap();  // guarantee that the above print is written to console
+
+    if io::stdin().read_line(&mut input).is_err() {
+        println!("Unable to read your input. Try again.");
+        return get_board_size();
+    }
+
+    let depth_str = input.trim();
+    let depth_parsed = depth_str.parse::<usize>();
+    if depth_parsed.is_err() {
+        println!("\"{}\" is not a valid board size. Please enter a positive integer.", depth_str);
+        return get_board_size();
+    }
+
+    let depth = depth_parsed.unwrap();
+    if depth > size*size {
+        println!("Please enter a smaller number. There are only {} moves on a board of size {}.", size*size, size);
+        return get_board_size();
+    }
+
+    depth
+}
+
+fn get_name(piece: Piece) -> String {
+    let mut input = String::new();
+    print!("Enter a name for player {}: ", piece);
+    std::io::stdout().flush().unwrap();  // guarantee that the above print is written to console
+
+    if io::stdin().read_line(&mut input).is_err() {
+        println!("Unable to read your input. Try again.");
+        return get_name(piece);
+    }
+
+    input.trim().to_string()
 }
