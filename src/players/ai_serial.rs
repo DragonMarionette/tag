@@ -72,11 +72,11 @@ impl AiSerial {
         scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
     }
 
-    fn analyze(&mut self, b: &Board, depth_remaining: usize) -> MoveAnalysis {
+    fn analyze(&mut self, b: &Board, depth_to_use: usize) -> MoveAnalysis {
         // assumes it is getting an already-standardized board
         if let Some(analysis) = self.known_boards.get(b) {
             // b already computed to sufficient depth
-            if analysis.depth_used >= depth_remaining {
+            if analysis.depth_used >= depth_to_use {
                 return analysis.clone();
             }
         }
@@ -102,7 +102,7 @@ impl AiSerial {
             return new_analysis;
         }
 
-        if depth_remaining == 0 {
+        if depth_to_use == 0 {
             let new_analysis = MoveAnalysis {
                 evaluation: MoveValue::Unknown(0),
                 move_options: available_spaces(b),
@@ -120,7 +120,7 @@ impl AiSerial {
             b.invert();
             let mut scrambled = ScrambledBoard::from_board(&b);
             scrambled.standardize();
-            let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_remaining - 1);
+            let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_to_use - 1);
 
             lower_analysis.evaluation = match lower_analysis.evaluation {
                 MoveValue::Lose(v) => MoveValue::Win(v + 1),
@@ -134,7 +134,7 @@ impl AiSerial {
         let shallowest_depth = new_analyses.iter().map(|a| a.1.depth_used).min().unwrap();
         let depth_used = shallowest_depth + 1;
 
-        // filter to keep only the best-evaluated moves
+        // filter to keep only the best-evaluated moves.TODO: simplify with an accumulator?
         let best_evaluation = new_analyses
             .iter()
             .map(|a| a.1.evaluation.clone())
