@@ -39,6 +39,12 @@ impl Player for AiSerial {
 
 impl AiSerial {
     pub fn new(size: usize, piece: Piece, depth: usize) -> Self {
+        let depth = if depth > size*size {
+            size*size
+        } else {
+            depth
+        };
+        
         Self {
             size,
             piece,
@@ -163,7 +169,7 @@ impl AiSerial {
             Piece::O => "O",
             _ => "_",
         };
-        format!("strategies/known-moves-s{}-p{}.cbor", self.size, piece_str)
+        format!("strategies/serial-s{}-p{}-d{}.cbor", self.size, piece_str, self.depth)
     }
 
     pub fn save_strategy(&self) {

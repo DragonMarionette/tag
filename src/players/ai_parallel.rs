@@ -270,7 +270,7 @@ impl AiParallel {
             _ => "_",
         };
         format!(
-            "strategies/known-moves-s{}-p{}-lazy.cbor",
+            "strategies/parallel-s{}-p{}-lazy.cbor",
             self.size, piece_str
         )
     }

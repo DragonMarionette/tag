@@ -189,7 +189,7 @@ impl AiLazy {
             _ => "_",
         };
         format!(
-            "strategies/known-moves-s{}-p{}-lazy.cbor",
+            "strategies/lazy-s{}-p{}-lazy.cbor",
             self.size, piece_str
         )
     }
