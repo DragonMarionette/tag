@@ -20,6 +20,9 @@ pub use ai_lazy::AiLazy;
 mod ai_parallel;
 pub use ai_parallel::AiParallel;
 
+mod ai_random;
+pub use ai_random::AiRandom;
+
 pub trait Player: Display {
     fn make_move(&mut self, game_board: &mut Board);
     fn piece(&self) -> Piece;
