@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn analyze_ai_parallel() {
         let size = SIZE;
-        let mut ai_x = AiParallel::new(size, Piece::X, true);
+        let mut ai_x = AiParallel::new(size, Piece::X);
         let mut b = Board::new(size);
         ai_x.make_move(&mut b);
     }
@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn analyze_ai_lazy() {
         let size = SIZE;
-        let mut ai_x = AiLazy::new(size, Piece::X);
+        let mut ai_x = AiLazy::new(size, Piece::X, true);
         let mut b = Board::new(size);
         ai_x.make_move(&mut b);
     }

@@ -19,7 +19,6 @@ pub struct AiParallel {
     size: usize,
     piece: Piece,
     known_boards: Arc<RwLock<HashMap<Board, MoveAnalysis>>>,
-    predictable: bool
 }
 
 impl Display for AiParallel {
@@ -42,12 +41,11 @@ impl Player for AiParallel {
 }
 
 impl AiParallel {
-    pub fn new(size: usize, piece: Piece, predictable: bool) -> Self {
+    pub fn new(size: usize, piece: Piece) -> Self {
         Self {
             size,
             piece,
             known_boards: Arc::new(RwLock::new(HashMap::new())),
-            predictable
         }
     }
 
@@ -68,12 +66,9 @@ impl AiParallel {
             .choose(&mut rand::thread_rng())
             .unwrap();
         chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
-
-        match self.predictable {
-            true => chosen_move_initial,
-            false => self.equivalent_move(chosen_move_initial, &game_board),
-        }
-
+        
+        self.equivalent_move(chosen_move_initial, &game_board)
+        
     }
 
     fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {

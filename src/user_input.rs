@@ -45,7 +45,7 @@ enum PlayerSelection {
     Random,
     LimitedDepth,
     Deterministic,
-    Lazy,
+    Efficient,
     Comprehensive,
 }
 
@@ -56,7 +56,7 @@ impl Display for PlayerSelection {
             Self::Random => "Completely random AI",
             Self::LimitedDepth => "Limited-depth AI",
             Self::Deterministic => "Deterministic perfect AI",
-            Self::Lazy => "Somewhat predictable perfect AI",
+            Self::Efficient => "Somewhat predictable perfect AI",
             Self::Comprehensive => "Unpredictable perfect AI",
         };
         write!(f, "{}", str)
@@ -79,13 +79,13 @@ impl PlayerSelection {
                 new_player.load_strategy();
                 new_player
             },
-            Self::Deterministic => { // TODO: switch to AiLazy once that struct uses bool predictable
-                let mut new_player = Box::new(AiParallel::new(board_size, piece, true));
+            Self::Deterministic => {
+                let mut new_player = Box::new(AiLazy::new(board_size, piece, true));
                 new_player.load_strategy();
                 new_player
             },
-            Self::Lazy => {
-                let mut new_player = Box::new(AiLazy::new(board_size, piece));
+            Self::Efficient => {
+                let mut new_player = Box::new(AiParallel::new(board_size, piece));
                 new_player.load_strategy();
                 new_player
             },
@@ -103,7 +103,7 @@ impl PlayerSelection {
             Self::Random,
             Self::LimitedDepth,
             Self::Deterministic,
-            Self::Lazy,
+            Self::Efficient,
             Self::Comprehensive,
         ]
     }

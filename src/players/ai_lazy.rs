@@ -1,3 +1,5 @@
+// TODO: reimplement MoveAnalysis to use a single coord instead of a vec
+
 use ciborium::{de, ser};
 use rand::{seq::SliceRandom, thread_rng};
 use std::collections::HashMap;
@@ -16,6 +18,7 @@ pub struct AiLazy {
     size: usize,
     piece: Piece,
     known_boards: HashMap<Board, MoveAnalysis>,
+    deterministic: bool,
 }
 
 impl Display for AiLazy {
@@ -40,11 +43,12 @@ impl Player for AiLazy {
 }
 
 impl AiLazy {
-    pub fn new(size: usize, piece: Piece) -> Self {
+    pub fn new(size: usize, piece: Piece, deterministic: bool) -> Self {
         Self {
             size,
             piece,
             known_boards: HashMap::new(),
+            deterministic,
         }
     }
 
@@ -66,9 +70,10 @@ impl AiLazy {
             .unwrap();
         chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
 
-        let chosen_move = self.equivalent_move(chosen_move_initial, &game_board);
-
-        chosen_move
+        match self.deterministic {
+            true => chosen_move_initial,
+            false => self.equivalent_move(chosen_move_initial, &game_board),
+        }
     }
 
     fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {
