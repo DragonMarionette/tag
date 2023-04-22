@@ -1,6 +1,7 @@
 pub mod game;
 pub mod space;
 pub mod players;
+pub mod user_input;
 
 mod board;
 pub use board::Board;
