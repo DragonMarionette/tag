@@ -2,22 +2,27 @@
 
 use ciborium::{de, ser};
 use rand::{seq::SliceRandom, thread_rng};
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 
 use super::available_spaces;
-use super::{MoveAnalysis, MoveValue, Player};
+use super::{MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
 use crate::ScrambledBoard;
 
-const MAX_DEPTH: usize = 100;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LazyMoveAnalysis {
+    pub evaluation: MoveValue,
+    pub move_option: Option<Coord>,
+}
 
 pub struct AiLazy {
     size: usize,
     piece: Piece,
-    known_boards: HashMap<Board, MoveAnalysis>,
+    known_boards: HashMap<Board, LazyMoveAnalysis>,
     deterministic: bool,
 }
 
@@ -64,15 +69,13 @@ impl AiLazy {
 
         let analysis = self.analyze(&key);
 
-        let mut chosen_move_initial = *analysis
-            .move_options
-            .choose(&mut rand::thread_rng())
-            .unwrap();
-        chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
+        
+        let mut chosen_move = analysis.move_option.unwrap();
+        chosen_move = scrambled.space_at(chosen_move).unwrap().to_coord();
 
         match self.deterministic {
-            true => chosen_move_initial,
-            false => self.equivalent_move(chosen_move_initial, &game_board),
+            true => chosen_move,
+            false => self.equivalent_move(chosen_move, &game_board),
         }
     }
 
@@ -99,7 +102,7 @@ impl AiLazy {
         equivalent.choose(&mut thread_rng()).unwrap().clone()
     }
 
-    fn analyze(&mut self, b: &Board) -> MoveAnalysis {
+    fn analyze(&mut self, b: &Board) -> LazyMoveAnalysis {
         // assumes it is getting an already-standardized board
         if let Some(analysis) = self.known_boards.get(b) {
             return analysis.clone();
@@ -107,27 +110,26 @@ impl AiLazy {
 
         if b.has_win(self.piece.inverse()) {
             // b already has other player winning
-            let new_analysis = MoveAnalysis {
+            let new_analysis = LazyMoveAnalysis {
                 evaluation: MoveValue::Lose(0),
-                move_options: vec![],
-                depth_used: MAX_DEPTH, // no need to ever reanalyze this position deeper
+                move_option: None,
             };
             self.known_boards.insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
         if b.is_full() {
-            let new_analysis = MoveAnalysis {
+            let new_analysis = LazyMoveAnalysis {
                 evaluation: MoveValue::Tie(0),
-                move_options: vec![],
-                depth_used: MAX_DEPTH, // no need to ever reanalyze this position deeper
+                move_option: None,
             };
             self.known_boards.insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
         // recursive case
-        let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
+        let mut best_coord = *available_spaces(b).get(0).unwrap();
+        let mut best_evaluation = MoveValue::Lose(0); // lowest possible evaluation to start
         for c in available_spaces(b) {
             let mut recursion_board = b.clone();
             recursion_board.place(self.piece, c.row, c.col).unwrap();
@@ -145,36 +147,24 @@ impl AiLazy {
 
             // short circuit as soon as a win is found. Thus considers every win equally optimal
             if let MoveValue::Win(_) = lower_analysis.evaluation {
-                let new_analysis = MoveAnalysis {
+                let new_analysis = LazyMoveAnalysis {
                     evaluation: lower_analysis.evaluation,
-                    move_options: vec![c],
-                    depth_used: MAX_DEPTH,
+                    move_option:Some(c),
                 };
 
                 self.known_boards.insert(b.clone(), new_analysis.clone());
                 return new_analysis;
             }
 
-            new_analyses.push((c, lower_analysis));
+            if lower_analysis.evaluation > best_evaluation {
+                best_coord = c;
+                best_evaluation = lower_analysis.evaluation;
+            }
         }
 
-        // filter to keep only the best-evaluated moves
-        let best_evaluation = new_analyses
-            .iter()
-            .map(|a| a.1.evaluation.clone())
-            .max()
-            .unwrap();
-        new_analyses = new_analyses
-            .into_iter()
-            .filter(|a| a.1.evaluation == best_evaluation)
-            .collect();
-
-        let move_options = new_analyses.iter().map(|a| a.0).collect();
-
-        let new_analysis = MoveAnalysis {
+        let new_analysis = LazyMoveAnalysis {
             evaluation: best_evaluation,
-            move_options,
-            depth_used: MAX_DEPTH,
+            move_option: Some(best_coord),
         };
         self.known_boards.insert(b.clone(), new_analysis.clone());
 
@@ -211,7 +201,7 @@ impl AiLazy {
             println!("Read strategy from {}", self.cbor_path(false));
             Some(())
         } else if let Ok(f) = File::open(self.cbor_path(true)) {
-            let known_boards_inverted: HashMap<Board, MoveAnalysis> = de::from_reader(f).unwrap();
+            let known_boards_inverted: HashMap<Board, LazyMoveAnalysis> = de::from_reader(f).unwrap();
             for b in known_boards_inverted.keys() {
                 let analysis = known_boards_inverted.get(b).unwrap();
                 self.known_boards.insert(b.inverse(), analysis.clone());
