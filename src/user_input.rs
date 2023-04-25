@@ -1,11 +1,13 @@
+use crate::board::GridError;
 use crate::players::{AiLazy, AiParallel, AiRandom, AiSerial, Human, Player};
-use crate::space::Piece;
-use inquire::Select;
-use inquire::validator::ErrorMessage;
+use crate::space::{Piece, Coord};
+use crate::Board;
+use inquire::validator::{ErrorMessage, StringValidator};
 use inquire::{
     validator::{CustomTypeValidator, Validation},
     CustomType, InquireError, Text,
 };
+use inquire::{CustomUserError, Select};
 use std::fmt::Display;
 
 pub fn get_board_size() -> usize {
@@ -69,31 +71,32 @@ impl PlayerSelection {
             Self::Human => {
                 let new_player = Box::new(Human::new(&get_name(piece), piece));
                 new_player
-            },
+            }
             Self::Random => {
                 let new_player = Box::new(AiRandom::new(piece));
                 new_player
-            },
+            }
             Self::LimitedDepth => {
-                let mut new_player = Box::new(AiSerial::new(board_size, piece, get_depth(board_size)));
+                let mut new_player =
+                    Box::new(AiSerial::new(board_size, piece, get_depth(board_size)));
                 new_player.load_strategy();
                 new_player
-            },
+            }
             Self::Deterministic => {
                 let mut new_player = Box::new(AiLazy::new(board_size, piece, true));
                 new_player.load_strategy();
                 new_player
-            },
+            }
             Self::Efficient => {
                 let mut new_player = Box::new(AiParallel::new(board_size, piece));
                 new_player.load_strategy();
                 new_player
-            },
+            }
             Self::Comprehensive => {
                 let mut new_player = Box::new(AiSerial::new(board_size, piece, usize::MAX));
                 new_player.load_strategy();
                 new_player
-            },
+            }
         }
     }
 
@@ -111,8 +114,7 @@ impl PlayerSelection {
 
 pub fn get_player(piece: Piece, board_size: usize) -> Box<dyn Player> {
     let message = format!("Select a player type for {}:", piece);
-    let player_choice = Select::new(&message, PlayerSelection::variants())
-    .prompt();
+    let player_choice = Select::new(&message, PlayerSelection::variants()).prompt();
 
     match player_choice {
         Ok(p) => p.to_player(piece, board_size),
@@ -120,7 +122,6 @@ pub fn get_player(piece: Piece, board_size: usize) -> Box<dyn Player> {
         Err(InquireError::OperationCanceled) => panic!("User interrupted with esc"),
         Err(e) => panic!("{}", e),
     }
-    
 }
 
 fn get_depth(board_size: usize) -> usize {
@@ -171,4 +172,134 @@ fn get_name(piece: Piece) -> String {
         Err(InquireError::OperationCanceled) => panic!("User interrupted with esc"), // Possibly refactor to allow this to back up one prompt level
         Err(e) => panic!("{}", e),
     }
+}
+
+#[derive(Clone)]
+struct MoveSyntaxValidator;
+impl StringValidator for MoveSyntaxValidator {
+    fn validate(&self, input: &str) -> Result<Validation, CustomUserError> {
+        let standard_err = Ok(Validation::Invalid(ErrorMessage::Custom(
+            "Invalid space. Enter in the form \"A1\"".to_string(),
+        )));
+        let mut chars = input.chars();
+
+        // first character
+        match chars.next() {
+            None => {
+                return standard_err;
+            },
+            Some(c) => {
+                if !c.is_ascii_alphabetic() {
+                    return standard_err;
+                }
+            }
+        }
+
+        // second character
+        match chars.next() {
+            None => {
+                return standard_err;
+            },
+            Some(c) => {
+                if !c.is_numeric() {
+                    return standard_err;
+                }
+            }
+        }
+        
+        if let Some(_) = chars.next() {
+            return standard_err;
+        }
+
+        Ok(Validation::Valid)
+    }
+}
+
+#[derive(Clone)]
+struct MovePlacementValidator {b: Board}
+impl StringValidator for MovePlacementValidator {
+    fn validate(&self, input: &str) -> Result<Validation, CustomUserError> {
+        let input = input.to_uppercase();
+
+        let mut chars = input.chars();
+
+        // first character
+        let col_char = chars.next().expect("Input was not validated properly");
+        let col = col_char as u8 - b'A';
+
+        // second character
+        let row_char = chars.next().expect("Input was not validated properly");
+        let row = row_char as u8 - b'1';
+        
+
+        
+        match self.b.clone().place(Piece::X, row as usize, col as usize) {
+            Err(GridError::RowIndexOutOfBounds { .. }) => {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    format!("Invalid space, row {} out of bounds", row_char)
+                )))
+            }
+            Err(GridError::ColIndexOutOfBounds { .. }) => {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    format!("Invalid space, column {} out of bounds", col_char)
+                )))
+            }
+            Err(GridError::SpaceOccupied { .. }) => {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    format!("Space {}{} is already occupied", col_char, row_char)
+                )))
+            }
+            Ok(_) => Ok(Validation::Valid),
+        }
+    }
+}
+impl MovePlacementValidator {
+    // assumes string is already in the correct format
+    fn coord_from_str(move_str: &str) -> Coord{
+        let move_str = move_str.to_uppercase();
+
+        let row: u8;
+        let col: u8;
+
+        let mut chars = move_str.chars();
+        if let Some(col_char) = chars.next() {
+            col = col_char as u8 - b'A';
+        }
+        else {
+            panic!("Input was not validated properly")
+        }
+
+        // second character
+        if let Some(row_char) = chars.next() {
+            row = row_char as u8 - b'1';
+        }
+        else {
+            panic!("Input was not validated properly")
+        }
+
+        Coord {row: row as usize, col: col as usize}
+    }
+}
+
+pub fn get_move(name: &str, b: &Board) -> Coord {
+    let validators: Vec<Box<dyn StringValidator>> = vec![
+        Box::new(MoveSyntaxValidator),
+        Box::new(MovePlacementValidator {b: b.clone()})
+    ];
+    let move_result = Text::new(&format!("{}, enter your move: ", name))
+    .with_validators(&validators)
+    .prompt();
+
+    match move_result {
+        Ok(move_str) => MovePlacementValidator::coord_from_str(&move_str),
+        _ => panic!("Encountered an error")
+    }
+
+
+    // let columns_open = vec![];
+    // let col_message = format!("{}, choose a column: ", name);
+    // let col_choice = Select::new(&col_message, columns_open)
+    // .prompt();
+
+
 }
