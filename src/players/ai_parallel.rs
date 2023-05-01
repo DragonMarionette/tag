@@ -49,9 +49,9 @@ impl AiParallel {
         }
     }
 
-    fn choose_move(&mut self, player: Piece, game_board: &Board) -> Coord {
-        let mut scrambled = ScrambledBoard::from_board(game_board);
-        if player != self.piece {
+    fn choose_move(&mut self, piece_to_play: Piece, game_board: &Board) -> Coord {
+        let mut scrambled = ScrambledBoard::from(game_board.clone());
+        if piece_to_play != self.piece {
             // if asking to play a different piece than known_boards assumes
             scrambled.invert();
         }
@@ -78,7 +78,7 @@ impl AiParallel {
             for col in 0..b.size{
                 let mut this_board = b.clone();
                 if this_board.place(self.piece, row, col).is_ok(){
-                    let standardized = ScrambledBoard::from_board(&this_board).into_standardized().to_board();
+                    let standardized = ScrambledBoard::from(this_board).into_standardized().to_board();
                     moves.insert((row, col), standardized);
                 }
             }
@@ -142,7 +142,7 @@ impl AiParallel {
                     let mut b = b.clone();
                     b.place(self.piece, c.row, c.col).unwrap();
                     b.invert();
-                    let mut scrambled = ScrambledBoard::from_board(&b);
+                    let mut scrambled = ScrambledBoard::from(b);
                     scrambled.standardize();
 
                     let mut parents_inner = parents.clone();
@@ -182,7 +182,7 @@ impl AiParallel {
                     let mut b = b.clone();
                     b.place(self.piece, c.row, c.col).unwrap();
                     b.invert();
-                    let mut scrambled = ScrambledBoard::from_board(&b);
+                    let mut scrambled = ScrambledBoard::from(b);
                     scrambled.standardize();
 
                     let mut parents_inner = parents.clone();

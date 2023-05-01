@@ -57,10 +57,9 @@ impl AiLazy {
         }
     }
 
-    fn choose_move(&mut self, player: Piece, game_board: &Board) -> Coord {
-        let mut scrambled = ScrambledBoard::from_board(game_board);
-        if player != self.piece {
-            // if asking to play a different piece than known_boards assumes
+    fn choose_move(&mut self, piece_to_play: Piece, game_board: &Board) -> Coord {
+        let mut scrambled = ScrambledBoard::from(game_board.clone());
+        if piece_to_play != self.piece {
             scrambled.invert();
         }
         scrambled.standardize();
@@ -86,7 +85,7 @@ impl AiLazy {
             for col in 0..b.size{
                 let mut this_board = b.clone();
                 if this_board.place(self.piece, row, col).is_ok(){
-                    let standardized = ScrambledBoard::from_board(&this_board).into_standardized().to_board();
+                    let standardized = ScrambledBoard::from(this_board).into_standardized().to_board();
                     moves.insert((row, col), standardized);
                 }
             }
@@ -134,7 +133,7 @@ impl AiLazy {
             let mut recursion_board = b.clone();
             recursion_board.place(self.piece, c.row, c.col).unwrap();
             recursion_board.invert();
-            let mut scrambled = ScrambledBoard::from_board(&recursion_board);
+            let mut scrambled = ScrambledBoard::from(recursion_board);
             scrambled.standardize();
             let mut lower_analysis = self.analyze(&scrambled.to_board());
 

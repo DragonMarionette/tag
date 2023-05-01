@@ -53,9 +53,9 @@ impl AiSerial {
         }
     }
 
-    fn choose_move(&mut self, player: Piece, game_board: &Board) -> Coord {
-        let mut scrambled = ScrambledBoard::from_board(game_board);
-        if player != self.piece {
+    fn choose_move(&mut self, piece_to_play: Piece, game_board: &Board) -> Coord {
+        let mut scrambled = ScrambledBoard::from(game_board.clone());
+        if piece_to_play != self.piece {
             // if asking to play a different piece than known_boards assumes
             scrambled.invert();
         }
@@ -118,7 +118,7 @@ impl AiSerial {
             let mut b = b.clone();
             b.place(self.piece, c.row, c.col).unwrap();
             b.invert();
-            let mut scrambled = ScrambledBoard::from_board(&b);
+            let mut scrambled = ScrambledBoard::from(b);
             scrambled.standardize();
             let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_to_use - 1);
 
