@@ -11,8 +11,8 @@ pub struct ScrambledBoard {
     grid: Vec<Space>,
 }
 
-impl ScrambledBoard {
-    pub fn from_board(b: &Board) -> Self {
+impl From<Board> for ScrambledBoard {
+    fn from(b: Board) -> Self {
         let size = b.size;
         let mut grid = Vec::new();
         for (i, &piece) in b.flat().enumerate() {
@@ -26,6 +26,9 @@ impl ScrambledBoard {
 
         Self { size, grid }
     }
+}
+
+impl ScrambledBoard {
 
     pub fn to_original_board(&self) -> Board {
         let mut b = Board::new(self.size);
