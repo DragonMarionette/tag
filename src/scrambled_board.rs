@@ -149,7 +149,7 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
         o => return o,
     };
 
-    weight_positions(left, Piece::X).cmp(&weight_positions(right, Piece::X))
+    left.cmp(right)
 }
 
 fn count(row: &[Space], p: Piece) -> usize {
