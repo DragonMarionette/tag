@@ -2,7 +2,7 @@
 
 use ciborium::{de, ser};
 use rand::{seq::SliceRandom, thread_rng};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
@@ -64,11 +64,10 @@ impl AiLazy {
         }
         scrambled.standardize();
 
-        let key = scrambled.to_board();
+        let key = Board::from(&scrambled);
 
         let analysis = self.analyze(&key);
 
-        
         let mut chosen_move = analysis.move_option.unwrap();
         chosen_move = scrambled.space_at(chosen_move).unwrap().to_coord();
 
@@ -82,20 +81,24 @@ impl AiLazy {
         let mut moves: HashMap<(usize, usize), Board> = HashMap::new();
 
         for row in 0..b.size {
-            for col in 0..b.size{
+            for col in 0..b.size {
                 let mut this_board = b.clone();
-                if this_board.place(self.piece, row, col).is_ok(){
-                    let standardized = ScrambledBoard::from(this_board).into_standardized().to_board();
+                if this_board.place(self.piece, row, col).is_ok() {
+                    let standardized =
+                        Board::from(ScrambledBoard::from(this_board).into_standardized());
                     moves.insert((row, col), standardized);
                 }
             }
         }
         let mut equivalent: Vec<Coord> = Vec::new();
-        let reference_board = moves.get(&(reference_coord.row, reference_coord.col)).unwrap().clone();
+        let reference_board = moves
+            .get(&(reference_coord.row, reference_coord.col))
+            .unwrap()
+            .clone();
 
         for ((row, col), compared_board) in moves {
             if compared_board == reference_board {
-                equivalent.push(Coord { row, col});
+                equivalent.push(Coord { row, col });
             }
         }
         equivalent.choose(&mut thread_rng()).unwrap().clone()
@@ -135,7 +138,7 @@ impl AiLazy {
             recursion_board.invert();
             let mut scrambled = ScrambledBoard::from(recursion_board);
             scrambled.standardize();
-            let mut lower_analysis = self.analyze(&scrambled.to_board());
+            let mut lower_analysis = self.analyze(&Board::from(scrambled));
 
             lower_analysis.evaluation = match lower_analysis.evaluation {
                 MoveValue::Lose(v) => MoveValue::Win(v + 1),
@@ -148,7 +151,7 @@ impl AiLazy {
             if let MoveValue::Win(_) = lower_analysis.evaluation {
                 let new_analysis = LazyMoveAnalysis {
                     evaluation: lower_analysis.evaluation,
-                    move_option:Some(c),
+                    move_option: Some(c),
                 };
 
                 self.known_boards.insert(b.clone(), new_analysis.clone());
@@ -182,10 +185,7 @@ impl AiLazy {
             Piece::O => "O",
             _ => "_",
         };
-        format!(
-            "strategies/lazy-s{}-p{}-lazy.cbor",
-            self.size, piece_str
-        )
+        format!("strategies/lazy-s{}-p{}-lazy.cbor", self.size, piece_str)
     }
 
     pub fn save_strategy(&self) {
@@ -200,7 +200,8 @@ impl AiLazy {
             println!("Read strategy from {}", self.cbor_path(false));
             Some(())
         } else if let Ok(f) = File::open(self.cbor_path(true)) {
-            let known_boards_inverted: HashMap<Board, LazyMoveAnalysis> = de::from_reader(f).unwrap();
+            let known_boards_inverted: HashMap<Board, LazyMoveAnalysis> =
+                de::from_reader(f).unwrap();
             for b in known_boards_inverted.keys() {
                 let analysis = known_boards_inverted.get(b).unwrap();
                 self.known_boards.insert(b.inverse(), analysis.clone());

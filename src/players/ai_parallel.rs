@@ -1,8 +1,8 @@
-use rand::{thread_rng, seq::SliceRandom};
+use ciborium::{de, ser};
+use rand::{seq::SliceRandom, thread_rng};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
-use ciborium::{de, ser};
 
 use rayon::prelude::*;
 use std::sync::{Arc, RwLock};
@@ -57,7 +57,7 @@ impl AiParallel {
         }
         scrambled.standardize();
 
-        let key = scrambled.to_board();
+        let key = Board::from(&scrambled);
 
         let analysis = self.analyze(&key, 0, &Vec::new());
 
@@ -66,35 +66,43 @@ impl AiParallel {
             .choose(&mut rand::thread_rng())
             .unwrap();
         chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
-        
+
         self.equivalent_move(chosen_move_initial, &game_board)
-        
     }
 
     fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {
         let mut moves: HashMap<(usize, usize), Board> = HashMap::new();
 
         for row in 0..b.size {
-            for col in 0..b.size{
+            for col in 0..b.size {
                 let mut this_board = b.clone();
-                if this_board.place(self.piece, row, col).is_ok(){
-                    let standardized = ScrambledBoard::from(this_board).into_standardized().to_board();
+                if this_board.place(self.piece, row, col).is_ok() {
+                    let standardized =
+                        Board::from(ScrambledBoard::from(this_board).into_standardized());
                     moves.insert((row, col), standardized);
                 }
             }
         }
         let mut equivalent: Vec<Coord> = Vec::new();
-        let reference_board = moves.get(&(reference_coord.row, reference_coord.col)).unwrap().clone();
+        let reference_board = moves
+            .get(&(reference_coord.row, reference_coord.col))
+            .unwrap()
+            .clone();
 
         for ((row, col), compared_board) in moves {
             if compared_board == reference_board {
-                equivalent.push(Coord { row, col});
+                equivalent.push(Coord { row, col });
             }
         }
         equivalent.choose(&mut thread_rng()).unwrap().clone()
     }
 
-    fn analyze(&self, b: &Board, current_depth: usize, parents: &Vec<Arc<RwLock<bool>>>) -> MoveAnalysis {
+    fn analyze(
+        &self,
+        b: &Board,
+        current_depth: usize,
+        parents: &Vec<Arc<RwLock<bool>>>,
+    ) -> MoveAnalysis {
         // assumes it is getting an already-standardized board
         if let Some(analysis) = self.known_boards.read().unwrap().get(b) {
             // b already computed to sufficient depth
@@ -148,11 +156,8 @@ impl AiParallel {
                     let mut parents_inner = parents.clone();
                     parents_inner.push(Arc::new(RwLock::new(false)));
 
-                    let mut lower_analysis = self.analyze(
-                        &scrambled.to_board(),
-                        current_depth + 1,
-                        &parents_inner,
-                    );
+                    let mut lower_analysis =
+                        self.analyze(&Board::from(scrambled), current_depth + 1, &parents_inner);
 
                     lower_analysis.evaluation = match lower_analysis.evaluation {
                         MoveValue::Lose(v) => MoveValue::Win(v + 1),
@@ -188,11 +193,8 @@ impl AiParallel {
                     let mut parents_inner = parents.clone();
                     parents_inner.push(Arc::new(RwLock::new(false)));
 
-                    let mut lower_analysis = self.analyze(
-                        &scrambled.to_board(),
-                        current_depth + 1,
-                        &parents_inner,
-                    );
+                    let mut lower_analysis =
+                        self.analyze(&Board::from(scrambled), current_depth + 1, &parents_inner);
 
                     lower_analysis.evaluation = match lower_analysis.evaluation {
                         MoveValue::Lose(v) => MoveValue::Win(v + 1),
@@ -251,7 +253,7 @@ impl AiParallel {
 
         new_analysis
     }
-    
+
     pub fn cbor_path(&self, inverted: bool) -> String {
         let p = if inverted {
             self.piece.inverse()
@@ -285,7 +287,10 @@ impl AiParallel {
             let known_boards_inverted: HashMap<Board, MoveAnalysis> = de::from_reader(f).unwrap();
             for b in known_boards_inverted.keys() {
                 let analysis = known_boards_inverted.get(b).unwrap();
-                self.known_boards.write().unwrap().insert(b.inverse(), analysis.clone());
+                self.known_boards
+                    .write()
+                    .unwrap()
+                    .insert(b.inverse(), analysis.clone());
             }
             println!("Read strategy from {}", self.cbor_path(true));
             Some(())

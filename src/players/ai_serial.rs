@@ -39,12 +39,12 @@ impl Player for AiSerial {
 
 impl AiSerial {
     pub fn new(size: usize, piece: Piece, depth: usize) -> Self {
-        let depth = if depth > size*size {
-            size*size
+        let depth = if depth > size * size {
+            size * size
         } else {
             depth
         };
-        
+
         Self {
             size,
             piece,
@@ -61,7 +61,7 @@ impl AiSerial {
         }
         scrambled.standardize();
 
-        let key = scrambled.to_board();
+        let key = Board::from(&scrambled);
 
         let analysis = self.analyze(&key, self.depth);
 
@@ -120,7 +120,7 @@ impl AiSerial {
             b.invert();
             let mut scrambled = ScrambledBoard::from(b);
             scrambled.standardize();
-            let mut lower_analysis = self.analyze(&scrambled.to_board(), depth_to_use - 1);
+            let mut lower_analysis = self.analyze(&Board::from(scrambled), depth_to_use - 1);
 
             lower_analysis.evaluation = match lower_analysis.evaluation {
                 MoveValue::Lose(v) => MoveValue::Win(v + 1),
@@ -169,7 +169,10 @@ impl AiSerial {
             Piece::O => "O",
             _ => "_",
         };
-        format!("strategies/serial-s{}-p{}-d{}.cbor", self.size, piece_str, self.depth)
+        format!(
+            "strategies/serial-s{}-p{}-d{}.cbor",
+            self.size, piece_str, self.depth
+        )
     }
 
     pub fn save_strategy(&self) {
