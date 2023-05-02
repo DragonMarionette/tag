@@ -144,12 +144,10 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
     };
 
     match weight_positions(left, Piece::O).cmp(&weight_positions(right, Piece::O)) {
-        // if O's same, move to next step of comparison
-        Ordering::Equal => (),
-        o => return o,
-    };
-
-    left.cmp(right)
+        // if O's same, use derived comparison
+        Ordering::Equal => left.cmp(right),
+        o => o,
+    }
 }
 
 fn count(row: &[Space], p: Piece) -> usize {
