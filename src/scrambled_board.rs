@@ -138,13 +138,7 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
     let left_count = count(left, Piece::X);
     let right_count = count(right, Piece::X);
     match left_count.cmp(&right_count) {
-        // if X's equal and nonzero, move to next step of comparison
-        Ordering::Equal => (),
-        o => return o,
-    };
-
-    match weight_positions(left, Piece::O).cmp(&weight_positions(right, Piece::O)) {
-        // if O's same, use derived comparison
+        // if X's equal and nonzero, use derived comparison
         Ordering::Equal => left.cmp(right),
         o => o,
     }
@@ -152,11 +146,4 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
 
 fn count(row: &[Space], p: Piece) -> usize {
     row.iter().filter(|&space| space.piece == p).count()
-}
-
-fn weight_positions(row: &[Space], p: Piece) -> usize {
-    row.iter()
-        .enumerate()
-        .map(|(i, &space)| if space.piece == p { 1 << i } else { 0 })
-        .sum()
 }
