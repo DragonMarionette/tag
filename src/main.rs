@@ -22,13 +22,13 @@ fn play() {
     println!();
 
     match game::play_game(&mut p1, &mut p2, board_size) {
-        game::Winner::P1 => {
+        game::GameState::P1 => {
             println!("{} wins!", p1)
         },
-        game::Winner::P2 => {
+        game::GameState::P2 => {
             println!("{} wins!", p2)
         }
-        game::Winner::Tie => {
+        game::GameState::Tie => {
             println!("It's a tie!")
         }
     }
