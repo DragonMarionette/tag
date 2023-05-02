@@ -7,7 +7,7 @@ use crate::space::{Coord, Space, Piece};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ScrambledBoard {
-    size: usize,
+    pub size: usize,
     grid: Vec<Space>,
 }
 
@@ -29,25 +29,11 @@ impl From<Board> for ScrambledBoard {
 }
 
 impl ScrambledBoard {
-
     pub fn to_original_board(&self) -> Board {
         let mut b = Board::new(self.size);
         for space in self.spaces() {
             b.place(space.piece, space.row, space.col).unwrap();
         }
-        b
-    }
-
-    pub fn to_board(&self) -> Board {
-        let mut b = Board::new(self.size);
-
-        for row in 0..self.size {
-            for col in 0..self.size {
-                b.place(self.piece_at(Coord { row, col }).unwrap(), row, col)
-                    .unwrap();
-            }
-        }
-
         b
     }
 

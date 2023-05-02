@@ -168,6 +168,21 @@ impl From<ScrambledBoard> for Board {
     }
 }
 
+impl From<&ScrambledBoard> for Board {
+    fn from(scrambled: &ScrambledBoard) -> Self {
+        let mut b = Self::new(scrambled.size);
+        
+        for row in 0..b.size {
+            for col in 0..b.size {
+                b.place(scrambled.piece_at(Coord { row, col }).unwrap(), row, col)
+                    .unwrap();
+            }
+        }
+
+        b
+    }
+}
+
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut display_string = "".to_string();
