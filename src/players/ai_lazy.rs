@@ -1,5 +1,3 @@
-// TODO: reimplement MoveAnalysis to use a single coord instead of a vec
-
 use ciborium::{de, ser};
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
