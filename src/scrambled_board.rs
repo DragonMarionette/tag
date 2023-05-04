@@ -145,6 +145,8 @@ impl ScrambledBoard {
     }
 }
 
+// TODO: is_standard(b: &Board)
+
 fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
     if left == right {
         return Ordering::Equal;
