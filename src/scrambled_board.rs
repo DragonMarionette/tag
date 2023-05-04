@@ -29,6 +29,10 @@ impl From<Board> for ScrambledBoard {
 }
 
 impl ScrambledBoard {
+    pub fn bare_grid(&self) -> Vec<Piece> {
+        self.grid.iter().map(|s| s.piece).collect()
+    }
+
     pub fn to_original_board(&self) -> Board {
         let mut b = Board::new(self.size);
         for space in self.spaces() {
@@ -106,14 +110,33 @@ impl ScrambledBoard {
         let mut rows: Vec<&[Space]> = self.grid.chunks(self.size).collect();
         rows.sort_unstable_by(row_cmp);
         self.grid = rows.into_iter().flatten().map(|s| *s).collect();
-        
-        *self = self.clone().min(self.transposed());
+
+        let transposed = self.transposed();
+        if self.bare_grid() > transposed.bare_grid() {
+            *self = transposed;
+        }
     }
 
     pub fn standardized(&self) -> Self {
         let mut new_board = self.clone();
         new_board.standardize();
         new_board
+    }
+
+    pub fn is_standard(&self) -> bool {
+        ({
+            let rows: Vec<&[Space]> = self.grid.chunks(self.size).collect();
+            rows.windows(2).all(|w| row_cmp(&w[0], &w[1]) != Ordering::Greater)
+        })
+        &&
+        ({
+            let transposed = self.transposed();
+            (self.bare_grid() <= transposed.bare_grid()) && 
+            ({
+                let rows: Vec<&[Space]> = transposed.grid.chunks(self.size).collect();
+                rows.windows(2).all(|w| row_cmp(&w[0], &w[1]) != Ordering::Greater)
+            })
+        })
     }
 
     pub fn into_standardized(mut self) -> Self {
@@ -139,7 +162,7 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
     let right_count = count(right, Piece::X);
     match left_count.cmp(&right_count) {
         // if X's equal and nonzero, use derived comparison
-        Ordering::Equal => left.cmp(right),
+        Ordering::Equal => bare_row_cmp(left, right),
         o => o,
     }
 }
@@ -147,3 +170,8 @@ fn row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
 fn count(row: &[Space], p: Piece) -> usize {
     row.iter().filter(|&space| space.piece == p).count()
 }
+ fn bare_row_cmp(left: &&[Space], right: &&[Space]) -> Ordering {
+    let left: Vec<Piece> = left.iter().map(|&space| space.piece).collect();
+    let right: Vec<Piece> = right.iter().map(|&space| space.piece).collect();
+    left.cmp(&right)
+ }
