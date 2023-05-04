@@ -1,6 +1,6 @@
 use crate::{space::{Piece, Coord}, ScrambledBoard};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{fmt::Display, collections::VecDeque};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GridError {
@@ -180,6 +180,15 @@ impl From<&ScrambledBoard> for Board {
         }
 
         b
+    }
+}
+
+impl From<VecDeque<Piece>> for Board {
+    fn from(vd: VecDeque<Piece>) -> Self {
+        let size = f32::from(vd.len() as u8).sqrt() as usize;
+        assert_eq!(size*size, vd.len());
+
+        Self { size, grid: vd.into() }
     }
 }
 
