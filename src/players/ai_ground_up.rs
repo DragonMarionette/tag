@@ -1,18 +1,16 @@
 use ciborium::{de, ser};
+use itertools::Itertools;
 use serde::{Serialize, Deserialize};
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::fs::File;
-use std::iter::empty;
-use std::ops::Deref;
+use std::num;
 
 use super::{available_spaces, MoveValue, Player};
 use crate::space::{Coord, Piece};
 use crate::Board;
 use crate::ScrambledBoard;
-
-const PIECE_TYPES: [Piece;3] = [Piece::X, Piece::O, Piece::Empty];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoveAnalysis {
@@ -85,28 +83,105 @@ impl AiGroundUp {
     }
 
     fn build_strategy(&mut self) {
-        /*
-        for all possible full, sorted boards {
-            set analysis value to either tie or win
-            insert analysis
-        }
-        for all possible move # in (board.size**2-2)..=0 {
-            for all sorted boards with that # of moves {
-                if has win {
-                    insert analysis
+        let starting_piece = self.piece;
+        let mut current_piece = match self.size % 2 {
+            0 => self.piece.inverse(),
+            1 => self.piece,
+            _ => panic!("self.size % 2 was neither 0 nor 1"),
+        };
+
+        // for full boards
+        for b in BoardIterator::new(self.size, starting_piece)
+            .filter(|b| ScrambledBoard::from(b.clone()).is_standard())
+        {
+            let evaluation = if b.has_win(current_piece) {
+                if current_piece == self.piece {
+                    MoveValue::Win(0)
                 } else {
-                    analyses = for each available move {
-                        sort
-                        value = (value inverted) + 1
-                        (move, value)
-                    }.filter(Some).collect()
-                    max_value = analyses.map(value).max()
-                    move_options = analyses.filter_map(value == max => Some(move)).collect()
-                    insert analysis
+                    MoveValue::Lose(0)
                 }
-            }
+            } else {
+                MoveValue::Tie(0)
+            };
+
+            let analysis = MoveAnalysis {
+                evaluation,
+                move_options: Vec::new(),
+            };
+            self.known_boards.insert(b, analysis);
         }
-        */
+
+        // for unfull boards
+        for num_empty in 1..=(self.size*self.size) {
+            println!("num_empty = {}", num_empty);
+            current_piece = current_piece.inverse();
+            for (b, scrambled) in BoardIterator::from_move_number(self.size, starting_piece, num_empty)
+                .map(|b| (b.clone(), ScrambledBoard::from(b)))
+                .filter(|(_, sb)| sb.is_standard())
+            {
+                let evaluation: MoveValue;
+                let move_options: Vec<Coord>;
+
+                if b.has_win(current_piece) {
+                    if current_piece == self.piece {
+                        evaluation = MoveValue::Win(0);
+                        move_options = Vec::new();
+                    } else {
+                        evaluation = MoveValue::Lose(0);
+                        move_options = Vec::new();
+                    }
+                } else {
+                    let mut new_analyses: Vec<(Coord, MoveValue)> = Vec::new();
+
+                    for move_option in available_spaces(&b) {
+                        let mut sb = scrambled.clone();
+                        sb.place(current_piece.inverse(), move_option).expect("available_spaces yielded an illegal Coord");
+                        sb.fully_standardize();
+
+                        let k = &Board::from(sb);
+                        let mut lower_evaluation = self.known_boards.get(k)
+                            .expect(&format!("Requested this unknown board from known_boards:\n{}", k))
+                            .evaluation.clone();
+                        lower_evaluation = match lower_evaluation {
+                            MoveValue::Lose(v) => MoveValue::Lose(v + 1),
+                            MoveValue::Tie(v) => MoveValue::Tie(v + 1),
+                            MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
+                            MoveValue::Win(v) => MoveValue::Win(v + 1),
+                        };
+                        new_analyses.push((move_option, lower_evaluation));
+                    }
+
+                    if current_piece == self.piece {
+                        evaluation = new_analyses.iter()
+                            .map(|(_c, v)| v.clone())
+                            .max()
+                            .expect(&format!("new_analyses was empty for this board:\n{}", b));
+                        new_analyses = new_analyses.into_iter()
+                            .filter(|(_c, v)| v == &evaluation)
+                            .collect();
+                    } else {
+                        evaluation = new_analyses.iter()
+                            .map(|(_c, v)| v.clone())
+                            .min()
+                            .expect(&format!("new_analyses was empty for this board:\n{}", b));
+                        new_analyses = new_analyses.into_iter()
+                            .filter(|(_c, v)| v == &evaluation)
+                            .collect();
+                    }
+
+                    move_options = new_analyses.into_iter().map(|(c, _v)| c).collect();
+
+
+                }
+
+                let new_analysis = MoveAnalysis {
+                    evaluation,
+                    move_options,
+                };
+                
+                self.known_boards.insert(b, new_analysis);
+            } // end for boards
+        }// end for num_empty
     }
 
     pub fn cbor_path(&self, inverted: bool) -> String {
@@ -152,139 +227,79 @@ impl AiGroundUp {
     }
 }
 
-// struct BoardIterator<'a> {
-//     remaining_piece_counts: HashMap<Piece, u8>,
-//     piece_type_iterator: core::slice::Iter<'a, Piece>,
-//     current_piece: Piece,
-//     lower_iterator: Box<BoardIterator<'a>>,
-// }
 
-// impl <'a> Iterator for BoardIterator<'a> {
-//     type Item = Vec<Piece>;
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let mut tail: Vec<Piece>;
-//         loop {
-//             if let Some(tail_from_lower) = self.lower_iterator.next() {
-//                 tail = tail_from_lower;
-//                 break;
-//             }
-
-//             // lower_iter exhausted
-//             // so, cycle self.current_piece until you hit one with a nonzero count
-//             while self.remaining_piece_counts.get(&self.current_piece).unwrap() == &0 {
-//                 if let Some(current_piece) = self.piece_type_iterator.next() {
-//                     self.current_piece = *current_piece;
-//                     let mut lower_counts = self.remaining_piece_counts.clone();
-//                     *lower_counts.get_mut(&self.current_piece).unwrap() -= 1;
-
-//                     self.lower_iterator = Box::new(
-//                         BoardIterator::with_counts(lower_counts)
-//                     );
-//                 } else {
-//                     return None;
-//                 }
-//             }
-//         }
-
-//         // Now we have a valid current piece and a valid tail 
-//         let mut vec_out = vec![self.current_piece];
-//         vec_out.append(&mut tail);
-//         return Some(vec_out);
-//     }
-// }
-
-// impl <'a> BoardIterator<'a> {
-//     // creates iterator over all filled boards
-//     fn new(board_size: usize, starting_piece: Piece) -> Self {
-//         let board_size = board_size as u8;
-//         assert_ne!(starting_piece, Piece::Empty);
-
-//         let mut remaining_piece_counts = HashMap::new();
-//         remaining_piece_counts.insert(starting_piece, (board_size*board_size + 1) / 2);
-//         remaining_piece_counts.insert(starting_piece.inverse(), board_size*board_size / 2);
-
-//         let mut piece_type_iterator = PIECE_TYPES.iter();
-//         let current_piece = piece_type_iterator.next().copied().unwrap();
-//         Self {
-//             remaining_piece_counts,
-//             piece_type_iterator,
-//             current_piece,
-//             lower_iterator,
-//         }
-//     }
-
-//     fn with_counts(remaining_piece_counts: HashMap<Piece, u8>) -> Self {
-//         let mut piece_type_iterator = PIECE_TYPES.iter();
-//         let current_piece = piece_type_iterator.next().copied().unwrap();
-
-//         Self {
-//             remaining_piece_counts,
-//             piece_type_iterator,
-//             current_piece,
-//             lower_iterator,
-//         }
-//     }
-// }
-
-fn iterate_boards(board_size: usize, x_count: u8, o_count: u8, empty_count: u8) -> AnyIter<Vec<Piece>>{
-    let iter_x = match x_count {
-        0 => AnyIter::new(empty()),
-        _ => AnyIter::new(
-            iterate_boards(board_size, x_count - 1, o_count, empty_count).map(|mut v|{
-                let mut vec_out = vec![Piece::X];
-                vec_out.append(&mut v);
-                vec_out
-            }
-        ))
-    };
-    
-    let iter_o = match x_count {
-        0 => AnyIter::new(empty()),
-        _ => AnyIter::new(
-            iterate_boards(board_size, x_count, o_count - 1, empty_count).map(|mut v|{
-                let mut vec_out = vec![Piece::O];
-                vec_out.append(&mut v);
-                vec_out
-            }
-        ))
-    };
-
-    let iter_empty = match x_count {
-        0 => AnyIter::new(empty()),
-        _ => AnyIter::new(
-            iterate_boards(board_size, x_count, o_count, empty_count - 1).map(|mut v|{
-                let mut vec_out = vec![Piece::Empty];
-                vec_out.append(&mut v);
-                vec_out
-            }
-        ))
-    };
-
-    AnyIter::new(iter_x.chain(iter_o).chain(iter_empty))
+#[derive(Clone)]
+pub struct BoardIterator {
+    current_vec: VecDeque<Piece>,
+    len: usize,
+    boards_served: usize,
 }
 
-struct AnyIter<T> {
-    inner: Box<dyn Iterator<Item=T>>
-}
-
-impl <T> Iterator for AnyIter<T> {
-    type Item = T;
+impl Iterator for BoardIterator {
+    type Item = Board;
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        if self.boards_served >= self.len {
+           return None;
+        }
+
+        let b = Board::from(self.current_vec.clone());
+        self.boards_served += 1;
+
+        self.permute();
+
+        Some(b)
     }
 }
 
-impl<T> AnyIter<T> {
-    fn new(inner: impl Iterator<Item=T>) -> AnyIter<T>{
-        AnyIter {
-            inner: Box::new(inner)
+impl BoardIterator {
+    pub fn new(board_size: usize, starting_piece: Piece) -> Self {
+        Self::from_move_number(board_size, starting_piece, 0)
+    }
+
+    pub fn from_move_number(board_size: usize, starting_piece: Piece, num_empty: usize) -> Self {
+        let num_filled = board_size*board_size - num_empty;
+        match starting_piece {
+            Piece::X => Self::from_counts((num_filled + 1)/2, num_filled/2, num_empty),
+            Piece::O => Self::from_counts(num_filled/2, (num_filled + 1)/2, num_empty),
+            Piece::Empty => panic!("starting_piece was Piece::Empty")
         }
     }
-}
 
-impl<T> Deref for AnyIter<T> {
-    type Target = &dyn Iterator<T>;
-    fn deref(&self) -> &Self::Target {
-        self.inner.deref()
+    pub fn from_counts(count_x: usize, count_o: usize, count_empty: usize) -> Self {
+        let mut current_vec = vec![Piece::X; count_x];
+        current_vec.append(&mut vec![Piece::O; count_o]);
+        current_vec.append(&mut vec![Piece::Empty; count_empty]);
+        
+        Self {
+            current_vec: current_vec.into(),
+            len: num_integer::multinomial(&[count_x, count_o, count_empty]),
+            boards_served: 0
+        }
+
+    }
+
+    // implmentation of Aaron Williams's algorithm for permutations of a multiset
+    // detailed in https://dl.acm.org/doi/10.5555/1496770.1496877
+    // summarized at https://github.com/ekg/multipermute
+    fn permute(&mut self){
+        match self.current_vec.len() {
+            0 => (),
+            _ => {
+                let a = self.current_vec.pop_front().unwrap();
+                for (idx_b, (b, c)) in self.current_vec.iter().tuple_windows().enumerate() {
+                    
+                    if b < c {
+                        if &a > b {
+                            self.current_vec.insert(idx_b + 1, a);
+                        } else {
+                            let idx_c = idx_b + 1;
+                            self.current_vec.insert(idx_c + 1, a);
+                        }
+                        return;
+                    }
+                }
+                self.current_vec.push_back(a);
+            }
+        }
     }
 }
