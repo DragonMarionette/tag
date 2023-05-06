@@ -23,7 +23,7 @@ pub use ai_parallel::AiParallel;
 mod ai_random;
 pub use ai_random::AiRandom;
 
-mod ai_ground_up;
+pub mod ai_ground_up;
 pub use ai_ground_up::AiGroundUp;
 
 pub trait Player: Display {
