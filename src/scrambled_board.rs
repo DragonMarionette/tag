@@ -41,6 +41,14 @@ impl ScrambledBoard {
         b
     }
 
+    pub fn place(&mut self, p: Piece, c: Coord) -> Result<(), GridError> {
+        if self.piece_at(c)? != Piece::Empty {
+            return Err(GridError::SpaceOccupied { row: c.row, col: c.col });
+        }
+        self.grid[c.row*self.size + c.col].piece = p;
+        Ok(())
+    }
+
     pub fn spaces(&self) -> std::slice::Iter<'_, Space> {
         self.grid.iter()
     }
@@ -114,6 +122,12 @@ impl ScrambledBoard {
         let transposed = self.transposed();
         if self.bare_grid() > transposed.bare_grid() {
             *self = transposed;
+        }
+    }
+
+    pub fn fully_standardize(&mut self) {
+        while !self.is_standard() {
+            self.standardize();
         }
     }
 
