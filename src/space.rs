@@ -39,7 +39,7 @@ impl Display for Piece {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Coord {
     pub row: usize,
     pub col: usize,
@@ -49,18 +49,11 @@ pub struct Coord {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Space {
     pub piece: Piece,
-    pub row: usize,
-    pub col: usize,
-}
-
-impl Space {
-    pub fn to_coord(&self) -> Coord{
-        Coord {row: self.row, col: self.col}
-    }
+    pub coord: Coord
 }
 
 impl Debug for Space {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({}, {})", self.piece, self.row, self.col)
+        write!(f, "{}({}, {})", self.piece, self.coord.row, self.coord.col)
     }
 }

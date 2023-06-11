@@ -11,7 +11,7 @@ pub use scrambled_board::ScrambledBoard;
 
 #[cfg(test)]
 mod tests {
-    const SIZE: usize = 4;
+    const SIZE: usize = 5;
     use crate::{
         board::Board,
         players::{AiLazy, AiParallel, AiSerial, Player},

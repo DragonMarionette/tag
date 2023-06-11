@@ -18,7 +18,7 @@ pub struct LazyMoveAnalysis {
 }
 
 pub struct AiLazy {
-    size: usize,
+    board_size: usize,
     piece: Piece,
     known_boards: HashMap<Board, LazyMoveAnalysis>,
     deterministic: bool,
@@ -32,12 +32,10 @@ impl Display for AiLazy {
 
 impl Player for AiLazy {
     fn make_move(&mut self, game_board: &mut Board) {
-        assert_eq!(game_board.size, self.size);
+        assert_eq!(game_board.size, self.board_size);
 
         let chosen_move = self.choose_move(self.piece, game_board);
-        game_board
-            .place(self.piece(), chosen_move.row, chosen_move.col)
-            .unwrap();
+        game_board.place(self.piece(), chosen_move).unwrap();
     }
 
     fn piece(&self) -> Piece {
@@ -48,7 +46,7 @@ impl Player for AiLazy {
 impl AiLazy {
     pub fn new(size: usize, piece: Piece, deterministic: bool) -> Self {
         Self {
-            size,
+            board_size: size,
             piece,
             known_boards: HashMap::new(),
             deterministic,
@@ -67,39 +65,34 @@ impl AiLazy {
         let analysis = self.analyze(&key);
 
         let mut chosen_move = analysis.move_option.unwrap();
-        chosen_move = scrambled.space_at(chosen_move).unwrap().to_coord();
+        chosen_move = scrambled.space_at(chosen_move).unwrap().coord;
 
         match self.deterministic {
             true => chosen_move,
-            false => self.equivalent_move(chosen_move, &game_board),
+            false => self.equivalent_move(chosen_move, game_board),
         }
     }
 
     fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {
-        let mut moves: HashMap<(usize, usize), Board> = HashMap::new();
+        let mut moves: HashMap<Coord, Board> = HashMap::new();
 
-        for row in 0..b.size {
-            for col in 0..b.size {
-                let mut this_board = b.clone();
-                if this_board.place(self.piece, row, col).is_ok() {
-                    let standardized =
-                        Board::from(ScrambledBoard::from(this_board).into_standardized());
-                    moves.insert((row, col), standardized);
-                }
+        for c in available_spaces(b) {
+            let mut this_board = b.clone();
+            if this_board.place(self.piece, c).is_ok() {
+                this_board.fully_standardize();
+                moves.insert(c, this_board);
             }
         }
+
         let mut equivalent: Vec<Coord> = Vec::new();
-        let reference_board = moves
-            .get(&(reference_coord.row, reference_coord.col))
-            .unwrap()
-            .clone();
+        let reference_board = moves.get(&reference_coord).unwrap().clone();
 
-        for ((row, col), compared_board) in moves {
+        for (c, compared_board) in moves {
             if compared_board == reference_board {
-                equivalent.push(Coord { row, col });
+                equivalent.push(c);
             }
         }
-        equivalent.choose(&mut thread_rng()).unwrap().clone()
+        *equivalent.choose(&mut thread_rng()).unwrap()
     }
 
     fn analyze(&mut self, b: &Board) -> LazyMoveAnalysis {
@@ -132,18 +125,13 @@ impl AiLazy {
         let mut best_evaluation = MoveValue::Lose(0); // lowest possible evaluation to start
         for c in available_spaces(b) {
             let mut recursion_board = b.clone();
-            recursion_board.place(self.piece, c.row, c.col).unwrap();
+            recursion_board.place(self.piece, c).unwrap();
             recursion_board.invert();
-            let mut scrambled = ScrambledBoard::from(recursion_board);
-            scrambled.standardize();
-            let mut lower_analysis = self.analyze(&Board::from(scrambled));
+            recursion_board.standardize();
+            let mut lower_analysis = self.analyze(&recursion_board);
 
-            lower_analysis.evaluation = match lower_analysis.evaluation {
-                MoveValue::Lose(v) => MoveValue::Win(v + 1),
-                MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                MoveValue::Win(v) => MoveValue::Lose(v + 1),
-            };
+            lower_analysis.evaluation = lower_analysis.evaluation.invert();
+            lower_analysis.evaluation = lower_analysis.evaluation.increment();
 
             // short circuit as soon as a win is found. Thus considers every win equally optimal
             if let MoveValue::Win(_) = lower_analysis.evaluation {
@@ -183,11 +171,14 @@ impl AiLazy {
             Piece::O => "O",
             _ => "_",
         };
-        format!("strategies/lazy-s{}-p{}-lazy.cbor", self.size, piece_str)
+        format!(
+            "strategies/lazy-s{}-p{}-lazy.cbor",
+            self.board_size, piece_str
+        )
     }
 
     pub fn save_strategy(&self) {
-        let buffer = File::create(&self.cbor_path(false)).unwrap(); // TODO: make safe
+        let buffer = File::create(self.cbor_path(false)).unwrap(); // TODO: make safe
         ser::into_writer(&self.known_boards, buffer).unwrap();
         println!("Saved strategy to {}", self.cbor_path(false));
     }

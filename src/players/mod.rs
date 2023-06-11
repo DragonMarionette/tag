@@ -9,6 +9,7 @@ use crate::{
 };
 
 mod human;
+pub mod ai_top_down;
 pub use human::Human;
 
 mod ai_serial;
@@ -72,13 +73,29 @@ impl Ord for MoveValue {
 }
 
 impl MoveValue {
-    #[allow(dead_code)]
     pub fn depth(&self) -> u8 {
         match *self {
             MoveValue::Lose(v) => v,
             MoveValue::Tie(v) => v,
             MoveValue::Unknown(v) => v,
             MoveValue::Win(v) => v,
+        }
+    }
+
+    pub fn increment(&self) -> Self {
+        match self {
+            MoveValue::Lose(v) => MoveValue::Lose(v + 1),
+            MoveValue::Tie(v) => MoveValue::Tie(v + 1),
+            MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
+            MoveValue::Win(v) => MoveValue::Win(v + 1),
+        }
+    }
+
+    pub fn invert(&self) -> Self {
+        match self {
+            MoveValue::Lose(v) => MoveValue::Win(*v),
+            MoveValue::Win(v) => MoveValue::Lose(*v),
+            mv => mv.clone(),
         }
     }
 }
@@ -94,7 +111,7 @@ fn available_spaces(b: &Board) -> Vec<Coord> {
     let mut result = Vec::new();
     for row in 0..b.size {
         for col in 0..b.size {
-            if b.piece_at(row, col) == Ok(Piece::Empty) {
+            if b.piece_at(Coord {row, col}) == Ok(Piece::Empty) {
                 result.push(Coord { row, col })
             }
         }

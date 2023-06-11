@@ -1,11 +1,10 @@
 use ciborium::{de, ser};
 use itertools::Itertools;
-use serde::{Serialize, Deserialize};
 use rand::seq::SliceRandom;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::fs::File;
-use std::num;
 
 use super::{available_spaces, MoveValue, Player};
 use crate::space::{Coord, Piece};
@@ -15,11 +14,11 @@ use crate::ScrambledBoard;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoveAnalysis {
     pub evaluation: MoveValue,
-    pub move_options: Vec<Coord>
+    pub move_options: Vec<Coord>,
 }
 
 pub struct AiGroundUp {
-    size: usize,
+    board_size: usize,
     piece: Piece,
     known_boards: HashMap<Board, MoveAnalysis>,
 }
@@ -32,12 +31,10 @@ impl Display for AiGroundUp {
 
 impl Player for AiGroundUp {
     fn make_move(&mut self, game_board: &mut Board) {
-        assert_eq!(game_board.size, self.size);
+        assert_eq!(game_board.size, self.board_size);
 
         let chosen_move = self.choose_move(self.piece, game_board);
-        game_board
-            .place(self.piece(), chosen_move.row, chosen_move.col)
-            .unwrap();
+        game_board.place(self.piece(), chosen_move).unwrap();
     }
 
     fn piece(&self) -> Piece {
@@ -46,9 +43,9 @@ impl Player for AiGroundUp {
 }
 
 impl AiGroundUp {
-    pub fn new(size: usize, piece: Piece) -> Self {
+    pub fn new(board_size: usize, piece: Piece) -> Self {
         Self {
-            size,
+            board_size,
             piece,
             known_boards: HashMap::new(),
         }
@@ -70,7 +67,7 @@ impl AiGroundUp {
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
+        scrambled.space_at(*chosen_move).unwrap().coord
     }
 
     fn analyze(&mut self, key: &Board) -> MoveAnalysis {
@@ -84,104 +81,107 @@ impl AiGroundUp {
 
     fn build_strategy(&mut self) {
         let starting_piece = self.piece;
-        let mut current_piece = match self.size % 2 {
+        let mut current_piece = match self.board_size % 2 {
             0 => self.piece.inverse(),
             1 => self.piece,
             _ => panic!("self.size % 2 was neither 0 nor 1"),
         };
 
         // for full boards
-        for b in BoardIterator::new(self.size, starting_piece)
-            .filter(|b| ScrambledBoard::from(b.clone()).is_standard())
-        {
-            let evaluation = if b.has_win(current_piece) {
-                if current_piece == self.piece {
-                    MoveValue::Win(0)
+        BoardIterator::new(self.board_size, starting_piece)
+            .filter(|b| b.is_standard())
+            .for_each(|b| {
+                let evaluation = if b.has_win(current_piece) {
+                    if current_piece == self.piece {
+                        MoveValue::Win(0)
+                    } else {
+                        MoveValue::Lose(0)
+                    }
                 } else {
-                    MoveValue::Lose(0)
-                }
-            } else {
-                MoveValue::Tie(0)
-            };
+                    MoveValue::Tie(0)
+                };
 
-            let analysis = MoveAnalysis {
-                evaluation,
-                move_options: Vec::new(),
-            };
-            self.known_boards.insert(b, analysis);
-        }
+                let analysis = MoveAnalysis {
+                    evaluation,
+                    move_options: Vec::new(),
+                };
+                self.known_boards.insert(b, analysis);
+            });
 
         // for unfull boards
-        for num_empty in 1..=(self.size*self.size) {
+        for num_empty in 1..=(self.board_size * self.board_size) {
             println!("num_empty = {}", num_empty);
             current_piece = current_piece.inverse();
-            for (b, scrambled) in BoardIterator::from_move_number(self.size, starting_piece, num_empty)
-                .map(|b| (b.clone(), ScrambledBoard::from(b)))
-                .filter(|(_, sb)| sb.is_standard())
-            {
-                let evaluation: MoveValue;
-                let move_options: Vec<Coord>;
+            BoardIterator::from_move_number(self.board_size, starting_piece, num_empty)
+                .filter(|b| b.is_standard())
+                .for_each(|b| {
+                    let evaluation: MoveValue;
+                    let move_options: Vec<Coord>;
 
-                if b.has_win(current_piece) {
-                    if current_piece == self.piece {
-                        evaluation = MoveValue::Win(0);
-                        move_options = Vec::new();
+                    if b.has_win(current_piece) {
+                        if current_piece == self.piece {
+                            evaluation = MoveValue::Win(0);
+                            move_options = Vec::new();
+                        } else {
+                            evaluation = MoveValue::Lose(0);
+                            move_options = Vec::new();
+                        }
                     } else {
-                        evaluation = MoveValue::Lose(0);
-                        move_options = Vec::new();
+                        let mut new_analyses: Vec<(Coord, MoveValue)> = Vec::new();
+
+                        for move_option in available_spaces(&b) {
+                            let mut sub_board = b.clone();
+                            sub_board
+                                .place(current_piece.inverse(), move_option)
+                                .expect("available_spaces yielded an illegal Coord");
+                            sub_board.fully_standardize();
+
+                            let mut lower_evaluation = self
+                                .known_boards
+                                .get(&sub_board)
+                                .unwrap_or_else(|| {
+                                    panic!(
+                                        "Requested this unknown board from known_boards:\n{}",
+                                        sub_board
+                                    )
+                                })
+                                .evaluation
+                                .clone();
+                            lower_evaluation = lower_evaluation.increment();
+                            new_analyses.push((move_option, lower_evaluation));
+                        }
+
+                        if current_piece == self.piece {
+                            evaluation = new_analyses
+                                .iter()
+                                .map(|(_c, v)| v.clone())
+                                .max()
+                                .unwrap_or_else(|| {
+                                    panic!("new_analyses was empty for this board:\n{}", b)
+                                });
+                            new_analyses.retain(|(_c, v)| v == &evaluation);
+                        } else {
+                            evaluation = new_analyses
+                                .iter()
+                                .map(|(_c, v)| v.clone())
+                                .min()
+                                .unwrap_or_else(|| {
+                                    panic!("new_analyses was empty for this board:\n{}", b)
+                                });
+                            new_analyses.retain(|(_c, v)| v == &evaluation);
+                        }
+
+                        move_options = new_analyses.into_iter().map(|(c, _v)| c).collect();
                     }
-                } else {
-                    let mut new_analyses: Vec<(Coord, MoveValue)> = Vec::new();
 
-                    for move_option in available_spaces(&b) {
-                        let mut sb = scrambled.clone();
-                        sb.place(current_piece.inverse(), move_option).expect("available_spaces yielded an illegal Coord");
-                        sb.fully_standardize();
+                    let new_analysis = MoveAnalysis {
+                        evaluation,
+                        move_options,
+                    };
 
-                        let k = &Board::from(sb);
-                        let mut lower_evaluation = self.known_boards.get(k)
-                            .expect(&format!("Requested this unknown board from known_boards:\n{}", k))
-                            .evaluation.clone();
-                        lower_evaluation = match lower_evaluation {
-                            MoveValue::Lose(v) => MoveValue::Lose(v + 1),
-                            MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                            MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                            MoveValue::Win(v) => MoveValue::Win(v + 1),
-                        };
-                        new_analyses.push((move_option, lower_evaluation));
-                    }
-
-                    if current_piece == self.piece {
-                        evaluation = new_analyses.iter()
-                            .map(|(_c, v)| v.clone())
-                            .max()
-                            .expect(&format!("new_analyses was empty for this board:\n{}", b));
-                        new_analyses = new_analyses.into_iter()
-                            .filter(|(_c, v)| v == &evaluation)
-                            .collect();
-                    } else {
-                        evaluation = new_analyses.iter()
-                            .map(|(_c, v)| v.clone())
-                            .min()
-                            .expect(&format!("new_analyses was empty for this board:\n{}", b));
-                        new_analyses = new_analyses.into_iter()
-                            .filter(|(_c, v)| v == &evaluation)
-                            .collect();
-                    }
-
-                    move_options = new_analyses.into_iter().map(|(c, _v)| c).collect();
-
-
-                }
-
-                let new_analysis = MoveAnalysis {
-                    evaluation,
-                    move_options,
-                };
-                
-                self.known_boards.insert(b, new_analysis);
-            } // end for boards
-        }// end for num_empty
+                    self.known_boards.insert(b, new_analysis);
+                }); // end for boards
+        } // end for num_empty
     }
 
     pub fn cbor_path(&self, inverted: bool) -> String {
@@ -198,12 +198,12 @@ impl AiGroundUp {
         };
         format!(
             "strategies/ground-up-s{}-p{}.cbor",
-            self.size, piece_str
+            self.board_size, piece_str
         )
     }
 
     pub fn save_strategy(&self) {
-        let buffer = File::create(&self.cbor_path(false)).unwrap(); // TODO: make safe
+        let buffer = File::create(self.cbor_path(false)).unwrap(); // TODO: make safe
         ser::into_writer(&self.known_boards, buffer).unwrap();
         println!("Saved strategy to {}", self.cbor_path(false));
     }
@@ -227,7 +227,6 @@ impl AiGroundUp {
     }
 }
 
-
 #[derive(Clone)]
 pub struct BoardIterator {
     current_vec: VecDeque<Piece>,
@@ -239,7 +238,7 @@ impl Iterator for BoardIterator {
     type Item = Board;
     fn next(&mut self) -> Option<Self::Item> {
         if self.boards_served >= self.len {
-           return None;
+            return None;
         }
 
         let b = Board::from(self.current_vec.clone());
@@ -257,37 +256,45 @@ impl BoardIterator {
     }
 
     pub fn from_move_number(board_size: usize, starting_piece: Piece, num_empty: usize) -> Self {
-        let num_filled = board_size*board_size - num_empty;
+        let num_filled = board_size * board_size - num_empty;
         match starting_piece {
-            Piece::X => Self::from_counts((num_filled + 1)/2, num_filled/2, num_empty),
-            Piece::O => Self::from_counts(num_filled/2, (num_filled + 1)/2, num_empty),
-            Piece::Empty => panic!("starting_piece was Piece::Empty")
+            Piece::X => {
+                Self::from_counts(board_size, (num_filled + 1) / 2, num_filled / 2, num_empty)
+            }
+            Piece::O => {
+                Self::from_counts(board_size, num_filled / 2, (num_filled + 1) / 2, num_empty)
+            }
+            Piece::Empty => panic!("starting_piece was Piece::Empty"),
         }
     }
 
-    pub fn from_counts(count_x: usize, count_o: usize, count_empty: usize) -> Self {
+    pub fn from_counts(
+        board_size: usize,
+        count_x: usize,
+        count_o: usize,
+        count_empty: usize,
+    ) -> Self {
+        assert_eq!(board_size * board_size, count_x + count_o + count_empty);
         let mut current_vec = vec![Piece::X; count_x];
         current_vec.append(&mut vec![Piece::O; count_o]);
         current_vec.append(&mut vec![Piece::Empty; count_empty]);
-        
+
         Self {
             current_vec: current_vec.into(),
             len: num_integer::multinomial(&[count_x, count_o, count_empty]),
-            boards_served: 0
+            boards_served: 0,
         }
-
     }
 
     // implmentation of Aaron Williams's algorithm for permutations of a multiset
     // detailed in https://dl.acm.org/doi/10.5555/1496770.1496877
     // summarized at https://github.com/ekg/multipermute
-    fn permute(&mut self){
+    fn permute(&mut self) {
         match self.current_vec.len() {
             0 => (),
             _ => {
                 let a = self.current_vec.pop_front().unwrap();
                 for (idx_b, (b, c)) in self.current_vec.iter().tuple_windows().enumerate() {
-                    
                     if b < c {
                         if &a > b {
                             self.current_vec.insert(idx_b + 1, a);

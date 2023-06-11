@@ -10,7 +10,7 @@ use crate::Board;
 use crate::ScrambledBoard;
 
 pub struct AiSerial {
-    size: usize,
+    board_size: usize,
     piece: Piece,
     depth: usize,
     known_boards: HashMap<Board, MoveAnalysis>,
@@ -24,12 +24,10 @@ impl Display for AiSerial {
 
 impl Player for AiSerial {
     fn make_move(&mut self, game_board: &mut Board) {
-        assert_eq!(game_board.size, self.size);
+        assert_eq!(game_board.size, self.board_size);
 
         let chosen_move = self.choose_move(self.piece, game_board);
-        game_board
-            .place(self.piece(), chosen_move.row, chosen_move.col)
-            .unwrap();
+        game_board.place(self.piece(), chosen_move).unwrap();
     }
 
     fn piece(&self) -> Piece {
@@ -46,7 +44,7 @@ impl AiSerial {
         };
 
         Self {
-            size,
+            board_size: size,
             piece,
             depth,
             known_boards: HashMap::new(),
@@ -69,7 +67,7 @@ impl AiSerial {
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        scrambled.space_at(chosen_move.clone()).unwrap().to_coord()
+        scrambled.space_at(*chosen_move).unwrap().coord
     }
 
     fn analyze(&mut self, b: &Board, depth_to_use: usize) -> MoveAnalysis {
@@ -115,19 +113,14 @@ impl AiSerial {
         // recursive case
         let mut new_analyses: Vec<(Coord, MoveAnalysis)> = Vec::new();
         available_spaces(b).into_iter().for_each(|c| {
-            let mut b = b.clone();
-            b.place(self.piece, c.row, c.col).unwrap();
-            b.invert();
-            let mut scrambled = ScrambledBoard::from(b);
-            scrambled.standardize();
-            let mut lower_analysis = self.analyze(&Board::from(scrambled), depth_to_use - 1);
+            let mut recursion_board = b.clone();
+            recursion_board.place(self.piece, c).unwrap();
+            recursion_board.invert();
+            recursion_board.standardize();
+            let mut lower_analysis = self.analyze(&recursion_board, depth_to_use - 1);
 
-            lower_analysis.evaluation = match lower_analysis.evaluation {
-                MoveValue::Lose(v) => MoveValue::Win(v + 1),
-                MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                MoveValue::Win(v) => MoveValue::Lose(v + 1),
-            };
+            lower_analysis.evaluation = lower_analysis.evaluation.invert();
+            lower_analysis.evaluation = lower_analysis.evaluation.increment();
 
             new_analyses.push((c, lower_analysis));
         });
@@ -140,10 +133,7 @@ impl AiSerial {
             .map(|a| a.1.evaluation.clone())
             .max()
             .unwrap();
-        new_analyses = new_analyses
-            .into_iter()
-            .filter(|a| a.1.evaluation == best_evaluation)
-            .collect();
+        new_analyses.retain(|a| a.1.evaluation == best_evaluation);
 
         let move_options = new_analyses.iter().map(|a| a.0).collect();
 
@@ -171,12 +161,12 @@ impl AiSerial {
         };
         format!(
             "strategies/serial-s{}-p{}-d{}.cbor",
-            self.size, piece_str, self.depth
+            self.board_size, piece_str, self.depth
         )
     }
 
     pub fn save_strategy(&self) {
-        let buffer = File::create(&self.cbor_path(false)).unwrap(); // TODO: make safe
+        let buffer = File::create(self.cbor_path(false)).unwrap(); // TODO: make safe
         ser::into_writer(&self.known_boards, buffer).unwrap();
         println!("Saved strategy to {}", self.cbor_path(false));
     }

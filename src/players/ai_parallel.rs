@@ -16,7 +16,7 @@ const MAX_SERIAL_DEPTH: usize = 3; // magic value found experimentally
 const MAX_DEPTH: usize = 100;
 
 pub struct AiParallel {
-    size: usize,
+    board_size: usize,
     piece: Piece,
     known_boards: Arc<RwLock<HashMap<Board, MoveAnalysis>>>,
 }
@@ -30,9 +30,7 @@ impl Display for AiParallel {
 impl Player for AiParallel {
     fn make_move(&mut self, game_board: &mut Board) {
         let chosen_move = self.choose_move(self.piece, game_board);
-        game_board
-            .place(self.piece(), chosen_move.row, chosen_move.col)
-            .unwrap();
+        game_board.place(self.piece(), chosen_move).unwrap();
     }
 
     fn piece(&self) -> Piece {
@@ -43,7 +41,7 @@ impl Player for AiParallel {
 impl AiParallel {
     pub fn new(size: usize, piece: Piece) -> Self {
         Self {
-            size,
+            board_size: size,
             piece,
             known_boards: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -65,36 +63,31 @@ impl AiParallel {
             .move_options
             .choose(&mut rand::thread_rng())
             .unwrap();
-        chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().to_coord();
+        chosen_move_initial = scrambled.space_at(chosen_move_initial).unwrap().coord;
 
-        self.equivalent_move(chosen_move_initial, &game_board)
+        self.equivalent_move(chosen_move_initial, game_board)
     }
 
     fn equivalent_move(&self, reference_coord: Coord, b: &Board) -> Coord {
-        let mut moves: HashMap<(usize, usize), Board> = HashMap::new();
+        let mut moves: HashMap<Coord, Board> = HashMap::new();
 
-        for row in 0..b.size {
-            for col in 0..b.size {
-                let mut this_board = b.clone();
-                if this_board.place(self.piece, row, col).is_ok() {
-                    let standardized =
-                        Board::from(ScrambledBoard::from(this_board).into_standardized());
-                    moves.insert((row, col), standardized);
-                }
+        for c in available_spaces(b) {
+            let mut this_board = b.clone();
+            if this_board.place(self.piece, c).is_ok() {
+                this_board.fully_standardize();
+                moves.insert(c, this_board);
             }
         }
+
         let mut equivalent: Vec<Coord> = Vec::new();
-        let reference_board = moves
-            .get(&(reference_coord.row, reference_coord.col))
-            .unwrap()
-            .clone();
+        let reference_board = moves.get(&reference_coord).unwrap().clone();
 
-        for ((row, col), compared_board) in moves {
+        for (c, compared_board) in moves {
             if compared_board == reference_board {
-                equivalent.push(Coord { row, col });
+                equivalent.push(c);
             }
         }
-        equivalent.choose(&mut thread_rng()).unwrap().clone()
+        *equivalent.choose(&mut thread_rng()).unwrap()
     }
 
     fn analyze(
@@ -147,24 +140,19 @@ impl AiParallel {
                     if *win_found.read().unwrap() || parents.iter().any(|rw| *rw.read().unwrap()) {
                         return None;
                     }
-                    let mut b = b.clone();
-                    b.place(self.piece, c.row, c.col).unwrap();
-                    b.invert();
-                    let mut scrambled = ScrambledBoard::from(b);
-                    scrambled.standardize();
+                    let mut recursion_board = b.clone();
+                    recursion_board.place(self.piece, c).unwrap();
+                    recursion_board.invert();
+                    recursion_board.standardize();
 
                     let mut parents_inner = parents.clone();
                     parents_inner.push(Arc::new(RwLock::new(false)));
 
                     let mut lower_analysis =
-                        self.analyze(&Board::from(scrambled), current_depth + 1, &parents_inner);
+                        self.analyze(&recursion_board, current_depth + 1, &parents_inner);
 
-                    lower_analysis.evaluation = match lower_analysis.evaluation {
-                        MoveValue::Lose(v) => MoveValue::Win(v + 1),
-                        MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                        MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                        MoveValue::Win(v) => MoveValue::Lose(v + 1),
-                    };
+                    lower_analysis.evaluation = lower_analysis.evaluation.invert();
+                    lower_analysis.evaluation = lower_analysis.evaluation.increment();
 
                     if let MoveValue::Win(_) = lower_analysis.evaluation {
                         *parents_inner.last().unwrap().write().unwrap() = true;
@@ -184,24 +172,19 @@ impl AiParallel {
                         return None;
                     }
 
-                    let mut b = b.clone();
-                    b.place(self.piece, c.row, c.col).unwrap();
-                    b.invert();
-                    let mut scrambled = ScrambledBoard::from(b);
-                    scrambled.standardize();
+                    let mut recursion_board: Board = b.clone();
+                    recursion_board.place(self.piece, c).unwrap();
+                    recursion_board.invert();
+                    recursion_board.standardize();
 
                     let mut parents_inner = parents.clone();
                     parents_inner.push(Arc::new(RwLock::new(false)));
 
                     let mut lower_analysis =
-                        self.analyze(&Board::from(scrambled), current_depth + 1, &parents_inner);
+                        self.analyze(&recursion_board, current_depth + 1, &parents_inner);
 
-                    lower_analysis.evaluation = match lower_analysis.evaluation {
-                        MoveValue::Lose(v) => MoveValue::Win(v + 1),
-                        MoveValue::Tie(v) => MoveValue::Tie(v + 1),
-                        MoveValue::Unknown(v) => MoveValue::Unknown(v + 1),
-                        MoveValue::Win(v) => MoveValue::Lose(v + 1),
-                    };
+                    lower_analysis.evaluation = lower_analysis.evaluation.invert();
+                    lower_analysis.evaluation = lower_analysis.evaluation.increment();
 
                     if let MoveValue::Win(_) = lower_analysis.evaluation {
                         *parents_inner.last().unwrap().write().unwrap() = true;
@@ -233,10 +216,7 @@ impl AiParallel {
             .map(|a| a.1.evaluation.clone())
             .max()
             .unwrap();
-        new_analyses = new_analyses
-            .into_iter()
-            .filter(|a| a.1.evaluation == best_evaluation)
-            .collect();
+        new_analyses.retain(|a| a.1.evaluation == best_evaluation);
 
         let move_options = new_analyses.iter().map(|a| a.0).collect();
 
@@ -268,12 +248,12 @@ impl AiParallel {
         };
         format!(
             "strategies/parallel-s{}-p{}-lazy.cbor",
-            self.size, piece_str
+            self.board_size, piece_str
         )
     }
 
     pub fn save_strategy(&self) {
-        let buffer = File::create(&self.cbor_path(false)).unwrap(); // TODO: make safe
+        let buffer = File::create(self.cbor_path(false)).unwrap(); // TODO: make safe
         ser::into_writer(&*self.known_boards.read().unwrap(), buffer).unwrap();
         println!("Saved strategy to {}", self.cbor_path(false));
     }

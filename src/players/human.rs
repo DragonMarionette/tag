@@ -33,6 +33,6 @@ impl Player for Human {
     }
     fn make_move(&mut self, game_board: &mut Board) {
         let c = user_input::get_move(&self.name, game_board);
-        game_board.place(self.piece, c.row, c.col).expect("Move was not validated properly");
+        game_board.place(self.piece, c).expect("Move was not validated properly");
     }
 }
