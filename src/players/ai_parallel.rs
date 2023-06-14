@@ -1,9 +1,10 @@
-use ciborium::{de, ser};
+// use ciborium::{de, ser};
 use rand::{seq::SliceRandom, thread_rng};
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::fs::File;
+// use std::fs::File;
 
+use dashmap::DashMap;
 use rayon::prelude::*;
 use std::sync::{Arc, RwLock};
 
@@ -18,7 +19,7 @@ const MAX_DEPTH: usize = 100;
 pub struct AiParallel {
     board_size: usize,
     piece: Piece,
-    known_boards: Arc<RwLock<HashMap<Board, MoveAnalysis>>>,
+    known_boards: Arc<DashMap<Board, MoveAnalysis>>,
 }
 
 impl Display for AiParallel {
@@ -43,7 +44,7 @@ impl AiParallel {
         Self {
             board_size: size,
             piece,
-            known_boards: Arc::new(RwLock::new(HashMap::new())),
+            known_boards: Arc::new(DashMap::new()),
         }
     }
 
@@ -97,7 +98,7 @@ impl AiParallel {
         parents: &Vec<Arc<RwLock<bool>>>,
     ) -> MoveAnalysis {
         // assumes it is getting an already-standardized board
-        if let Some(analysis) = self.known_boards.read().unwrap().get(b) {
+        if let Some(analysis) = self.known_boards.get(b) {
             // b already computed to sufficient depth
             return analysis.clone();
         }
@@ -109,10 +110,7 @@ impl AiParallel {
                 move_options: vec![],
                 depth_used: MAX_DEPTH, // max depth because no need to ever reanalyze this position deeper
             };
-            self.known_boards
-                .write()
-                .unwrap()
-                .insert(b.clone(), new_analysis.clone());
+            self.known_boards.insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
@@ -122,10 +120,7 @@ impl AiParallel {
                 move_options: vec![],
                 depth_used: MAX_DEPTH, // max depth because no need to ever reanalyze this position deeper
             };
-            self.known_boards
-                .write()
-                .unwrap()
-                .insert(b.clone(), new_analysis.clone());
+            self.known_boards.insert(b.clone(), new_analysis.clone());
             return new_analysis;
         }
 
@@ -226,56 +221,50 @@ impl AiParallel {
             depth_used,
         };
 
-        self.known_boards
-            .write()
-            .unwrap()
-            .insert(b.clone(), new_analysis.clone());
+        self.known_boards.insert(b.clone(), new_analysis.clone());
 
         new_analysis
     }
 
-    pub fn cbor_path(&self, inverted: bool) -> String {
-        let p = if inverted {
-            self.piece.inverse()
-        } else {
-            self.piece
-        };
+    // pub fn cbor_path(&self, inverted: bool) -> String {
+    //     let p = if inverted {
+    //         self.piece.inverse()
+    //     } else {
+    //         self.piece
+    //     };
 
-        let piece_str = match p {
-            Piece::X => "X",
-            Piece::O => "O",
-            _ => "_",
-        };
-        format!(
-            "strategies/parallel-s{}-p{}-lazy.cbor",
-            self.board_size, piece_str
-        )
-    }
+    //     let piece_str = match p {
+    //         Piece::X => "X",
+    //         Piece::O => "O",
+    //         _ => "_",
+    //     };
+    //     format!(
+    //         "strategies/parallel-s{}-p{}-lazy.cbor",
+    //         self.board_size, piece_str
+    //     )
+    // }
 
-    pub fn save_strategy(&self) {
-        let buffer = File::create(self.cbor_path(false)).unwrap(); // TODO: make safe
-        ser::into_writer(&*self.known_boards.read().unwrap(), buffer).unwrap();
-        println!("Saved strategy to {}", self.cbor_path(false));
-    }
+    // pub fn save_strategy(&self) {
+    //     let buffer = File::create(self.cbor_path(false)).unwrap(); // TODO: make safe
+    //     ser::into_writer(&*self.known_boards, buffer).unwrap();
+    //     println!("Saved strategy to {}", self.cbor_path(false));
+    // }
 
-    pub fn load_strategy(&mut self) -> Option<()> {
-        if let Ok(f) = File::open(self.cbor_path(false)) {
-            *self.known_boards.write().unwrap() = de::from_reader(f).unwrap();
-            println!("Read strategy from {}", self.cbor_path(false));
-            Some(())
-        } else if let Ok(f) = File::open(self.cbor_path(true)) {
-            let known_boards_inverted: HashMap<Board, MoveAnalysis> = de::from_reader(f).unwrap();
-            for b in known_boards_inverted.keys() {
-                let analysis = known_boards_inverted.get(b).unwrap();
-                self.known_boards
-                    .write()
-                    .unwrap()
-                    .insert(b.inverse(), analysis.clone());
-            }
-            println!("Read strategy from {}", self.cbor_path(true));
-            Some(())
-        } else {
-            None
-        }
-    }
+    // pub fn load_strategy(&mut self) -> Option<()> {
+    //     if let Ok(f) = File::open(self.cbor_path(false)) {
+    //         *self.known_boards = de::from_reader(f).unwrap();
+    //         println!("Read strategy from {}", self.cbor_path(false));
+    //         Some(())
+    //     } else if let Ok(f) = File::open(self.cbor_path(true)) {
+    //         let known_boards_inverted: HashMap<Board, MoveAnalysis> = de::from_reader(f).unwrap();
+    //         for b in known_boards_inverted.keys() {
+    //             let analysis = known_boards_inverted.get(b).unwrap();
+    //             self.known_boards.insert(b.inverse(), analysis.clone());
+    //         }
+    //         println!("Read strategy from {}", self.cbor_path(true));
+    //         Some(())
+    //     } else {
+    //         None
+    //     }
+    // }
 }

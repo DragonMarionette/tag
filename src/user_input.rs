@@ -83,7 +83,7 @@ impl PlayerSelection {
             }
             Self::Efficient => {
                 let mut new_player = Box::new(AiParallel::new(board_size, piece));
-                new_player.load_strategy();
+                // new_player.load_strategy();
                 new_player
             }
             Self::Comprehensive => {

@@ -15,6 +15,7 @@ rayon = "1.7.0"
 serde = { version = "1.0", features = ["derive"] }
 num-integer = "0.1"
 itertools = "0.10"
+dashmap = { version = "5.4.0", features = ["rayon", "serde"] }
 
 [profile.release]
 opt-level = 3
