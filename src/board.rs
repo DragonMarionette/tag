@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt::{Debug, Display},
+    hash::Hash,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,10 +46,16 @@ impl Display for GridError {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Board {
     pub size: usize,
     pub grid: Vec<Piece>,
+}
+
+impl Hash for Board {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.grid.hash(state);
+    }
 }
 
 impl Board {
