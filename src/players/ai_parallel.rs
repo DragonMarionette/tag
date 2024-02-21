@@ -1,8 +1,8 @@
-// use ciborium::{de, ser};
+use ciborium::{de, ser};
 use rand::{seq::SliceRandom, thread_rng};
 use std::collections::HashMap;
 use std::fmt::Display;
-// use std::fs::File;
+use std::fs::File;
 
 use dashmap::DashMap;
 use rayon::prelude::*;
@@ -40,9 +40,9 @@ impl Player for AiParallel {
 }
 
 impl AiParallel {
-    pub fn new(size: usize, piece: Piece) -> Self {
+    pub fn new(board_size: usize, piece: Piece) -> Self {
         Self {
-            board_size: size,
+            board_size,
             piece,
             known_boards: Arc::new(DashMap::new()),
         }
